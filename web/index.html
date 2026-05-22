@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>lvgl-html5-canvas viewer</title>
+  <style>
+    html, body { margin: 0; background: #1a1a1a; color: #ddd;
+                 font: 13px/1.4 system-ui, monospace; }
+    #bar { padding: 6px 10px; background: #222; }
+    #status { color: #6f6; }
+    #canvas { display: block; margin: 10px auto; background: #000;
+              image-rendering: pixelated; }
+    #log { padding: 6px 10px; max-height: 120px; overflow: auto;
+           background: #111; font-family: monospace; font-size: 11px; }
+    button, input { background: #333; color: #ddd; border: 1px solid #555;
+                    padding: 4px 8px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <label>WS URL <input id="url" value="ws://localhost:9000/" size="32" /></label>
+    <button id="connect">Connect</button>
+    <span id="status">disconnected</span>
+  </div>
+  <canvas id="canvas" width="800" height="480"></canvas>
+  <pre id="log"></pre>
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>

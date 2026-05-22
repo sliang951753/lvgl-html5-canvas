@@ -1,0 +1,35 @@
+{
+  "version": 4,
+  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "linux-host",
+      "displayName": "Linux host (LVGL 9.5 + libwebsockets)",
+      "description": "Default dev preset on Linux / Termux. SW renderer + html5 draw unit.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-host",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "LHC_BUILD_TESTS": "ON",
+        "LHC_BUILD_APP":   "ON"
+      }
+    },
+    {
+      "name": "linux-host-release",
+      "inherits": "linux-host",
+      "binaryDir": "${sourceDir}/build/linux-host-release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "linux-host",         "configurePreset": "linux-host" },
+    { "name": "linux-host-release", "configurePreset": "linux-host-release" }
+  ],
+  "testPresets": [
+    {
+      "name": "linux-host",
+      "configurePreset": "linux-host",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

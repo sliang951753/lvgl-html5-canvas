@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  linux-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build libssl-dev python3
+
+      - name: Configure
+        run: cmake --preset linux-host
+
+      - name: Build
+        run: cmake --build --preset linux-host -j
+
+      - name: Test
+        run: ctest --preset linux-host --output-on-failure
+
+      - name: Verify protocol.js is up-to-date
+        run: |
+          python3 src/proto/gen_js_protocol.py \
+            --header src/proto/protocol.h --out web/protocol.js --check

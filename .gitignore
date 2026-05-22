@@ -1,0 +1,13 @@
+build/
+build-*/
+.cache/
+.vs/
+.vscode/
+*.o
+*.obj
+*.exe
+*.swp
+*~
+.DS_Store
+third_party/_deps/
+compile_commands.json
