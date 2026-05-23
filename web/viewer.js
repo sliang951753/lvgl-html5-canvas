@@ -51,6 +51,12 @@ function storeBlob({ id, w, h, fmt, bytes }) {
     log(`blob ${id}: size mismatch got=${bytes.length} expect=${expect}`);
     return;
   }
+  // Re-upload of an existing blob_id is expected (server refresh for late joiners).
+  // blob_id is content-hash based, so same id => same pixels. Keep current cached
+  // bitmap/imageData to avoid draw-path toggling (putImageData <-> drawImage)
+  // that can appear as periodic flicker.
+  if (blobCache.has(id)) return;
+
   // Copy because the underlying frame buffer is reused per WS message.
   const copy = new Uint8ClampedArray(bytes); // copies via Uint8Array → Clamped
   const imageData = new ImageData(copy, w, h);
