@@ -74,6 +74,18 @@ static bool border_is_simple(const lv_draw_border_dsc_t *d)
     return true;
 }
 
+static bool box_shadow_is_simple(const lv_draw_box_shadow_dsc_t *d)
+{
+    /* M2: any visible box shadow. We forward width(=blur)/spread/offset
+     * verbatim — viewer maps to ctx.shadow* on a 1x1 invisible rect or
+     * stroked path. Skip zero-opa / zero-blur AND zero-spread AND zero-offset
+     * (truly invisible) but accept anything else. */
+    if (!d) return false;
+    if (d->opa == 0) return false;
+    if (d->width == 0 && d->spread == 0 && d->ofs_x == 0 && d->ofs_y == 0) return false;
+    return true;
+}
+
 /* ---- draw-unit callbacks ---- */
 
 static int32_t lhc_evaluate_cb(lv_draw_unit_t *du, lv_draw_task_t *task)
@@ -87,6 +99,9 @@ static int32_t lhc_evaluate_cb(lv_draw_unit_t *du, lv_draw_task_t *task)
     } else if (task->type == LV_DRAW_TASK_TYPE_BORDER) {
         const lv_draw_border_dsc_t *d = (const lv_draw_border_dsc_t *)task->draw_dsc;
         if (!border_is_simple(d)) return 0;
+    } else if (task->type == LV_DRAW_TASK_TYPE_BOX_SHADOW) {
+        const lv_draw_box_shadow_dsc_t *d = (const lv_draw_box_shadow_dsc_t *)task->draw_dsc;
+        if (!box_shadow_is_simple(d)) return 0;
     } else {
         return 0;
     }
@@ -136,6 +151,21 @@ static int32_t lhc_dispatch_cb(lv_draw_unit_t *du, lv_layer_t *layer)
             lhc_enc_border(&g_enc, x, y, w, h, argb, (uint8_t)bw, radius, side);
             g_ops_this_frame++;
             g_stats.borders_encoded++;
+        } else if (t->type == LV_DRAW_TASK_TYPE_BOX_SHADOW) {
+            const lv_draw_box_shadow_dsc_t *d = (const lv_draw_box_shadow_dsc_t *)t->draw_dsc;
+            uint32_t opa = (uint32_t)d->opa * (uint32_t)t->opa / 255u;
+            uint32_t argb = color_to_argb(d->color, (lv_opa_t)opa);
+            uint8_t  radius = (d->radius < 0) ? 0 :
+                              (d->radius > 255 ? 255 : (uint8_t)d->radius);
+            int32_t bw = d->width; if (bw < 0) bw = 0; if (bw > 255) bw = 255;
+            int32_t sp = d->spread; if (sp < -128) sp = -128; if (sp > 127) sp = 127;
+            int32_t ox = d->ofs_x; if (ox < -32768) ox = -32768; if (ox > 32767) ox = 32767;
+            int32_t oy = d->ofs_y; if (oy < -32768) oy = -32768; if (oy > 32767) oy = 32767;
+            lhc_enc_box_shadow(&g_enc, x, y, w, h, argb, radius, (uint8_t)bw,
+                               (int8_t)sp, (int16_t)ox, (int16_t)oy,
+                               (uint8_t)(d->bg_cover ? 1 : 0));
+            g_ops_this_frame++;
+            g_stats.shadows_encoded++;
         }
 
         if (g_enc.overflow && !g_overflow_logged_this_frame) {

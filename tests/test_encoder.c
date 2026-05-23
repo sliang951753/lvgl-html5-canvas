@@ -167,6 +167,42 @@ static int test_border_payload(void)
     return 0;
 }
 
+static int test_box_shadow_payload(void)
+{
+    uint8_t buf[1024];
+    lhc_enc_t e;
+    lhc_enc_init(&e, buf, sizeof(buf));
+    lhc_enc_begin_frame(&e, 0, 200, 200);
+    /* shadow: rect 10,20 100x60, argb 0x80112233 (alpha=0x80, semi-transp),
+       radius=12, blur=24, spread=-3, ofs=(6,-8), bg_cover=1 */
+    lhc_enc_box_shadow(&e, 10, 20, 100, 60, 0x80112233u, 12, 24,
+                       -3, 6, -8, 1);
+    lhc_enc_end_frame(&e);
+    size_t n = lhc_enc_finalize(&e);
+    CHECK(n > 0, "no overflow");
+    CHECK(e.cmd_count == 3, "3 cmds");
+    const uint8_t *p = buf + 12;
+    CHECK(p[0] == LHC_OP_BOX_SHADOW, "BOX_SHADOW opcode");
+    CHECK(p[1] == LHC_FLAG_HAS_ALPHA_HINT, "alpha hint set");
+    CHECK(p[2] == 20 && p[3] == 0, "payload_len=20");
+    /* rect */
+    CHECK(p[4] == 10 && p[5] == 0, "x LE");
+    CHECK(p[6] == 20 && p[7] == 0, "y LE");
+    CHECK(p[8] == 100 && p[9] == 0, "w LE");
+    CHECK(p[10] == 60 && p[11] == 0, "h LE");
+    /* argb 0x80112233 LE → 33 22 11 80 */
+    CHECK(p[12] == 0x33 && p[13] == 0x22 && p[14] == 0x11 && p[15] == 0x80, "argb LE");
+    CHECK(p[16] == 12, "radius");
+    CHECK(p[17] == 24, "blur");
+    CHECK((int8_t)p[18] == -3, "spread signed");
+    /* ofs_x=6 LE */
+    CHECK(p[19] == 6 && p[20] == 0, "ofs_x LE");
+    /* ofs_y=-8 LE → F8 FF */
+    CHECK(p[21] == 0xF8 && p[22] == 0xFF, "ofs_y LE signed");
+    CHECK(p[23] == 1, "bg_cover");
+    return 0;
+}
+
 int main(void)
 {
     struct { const char *name; int (*fn)(void); } tests[] = {
@@ -177,6 +213,7 @@ int main(void)
         { "multiple_fills",      test_multiple_fills },
         { "reinit_resets_state", test_reinit_resets_state },
         { "border_payload",      test_border_payload },
+        { "box_shadow_payload",  test_box_shadow_payload },
     };
     int failures = 0;
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {

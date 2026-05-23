@@ -135,6 +135,31 @@ function renderFrame(frame) {
         strokeBorder(ctx, d.x, d.y, d.w, d.h, d.width, d.radius, d.side);
         break;
       }
+      case Proto.OP_BOX_SHADOW: {
+        const d = Decoders[cmd.opcode](cmd.payload);
+        // LVGL box shadow: paint a rect outside the base rect, expanded by
+        // `spread`, offset by (ofs_x, ofs_y), with a Gaussian-ish blur of
+        // `blur` px. The bg fill that comes after covers the center, leaving
+        // only the halo. We approximate by drawing the shadow rect itself
+        // tinted with the shadow color and using canvas shadow* on a 0-offset
+        // shadow so the blur extends past the rect edges.
+        const sx = d.x - d.spread + d.ofs_x;
+        const sy = d.y - d.spread + d.ofs_y;
+        const sw = d.w + d.spread * 2;
+        const sh = d.h + d.spread * 2;
+        if (sw > 0 && sh > 0) {
+          const sr = Math.max(0, d.radius + d.spread);
+          ctx.save();
+          ctx.shadowColor = argbToCss(d.argb);
+          ctx.shadowBlur = d.blur;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.fillStyle = argbToCss(d.argb);
+          fillRoundedRect(ctx, sx, sy, sw, sh, sr);
+          ctx.restore();
+        }
+        break;
+      }
       default:
         // unknown opcode — silently skip (forward compat)
         break;
@@ -214,4 +239,4 @@ function handleMessage(data) {
   }
 }
 
-log('viewer M2 ready (FILL_RECT + BORDER)');
+log('viewer M2 ready (FILL_RECT + BORDER + BOX_SHADOW)');

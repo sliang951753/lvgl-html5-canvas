@@ -51,4 +51,15 @@ export const Decoders = {
     radius: p.getUint8(13),
     side:   p.getUint8(14),
   }),
+  [Proto.OP_BOX_SHADOW]:  (p) => ({
+    x: p.getInt16(0, true),  y: p.getInt16(2, true),
+    w: p.getInt16(4, true),  h: p.getInt16(6, true),
+    argb: p.getUint32(8, true) >>> 0,
+    radius: p.getUint8(12),
+    blur:   p.getUint8(13),
+    spread: p.getInt8(14),
+    ofs_x:  p.getInt16(15, true),
+    ofs_y:  p.getInt16(17, true),
+    bg_cover: p.getUint8(19),
+  }),
 };

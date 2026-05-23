@@ -49,6 +49,9 @@ void lhc_enc_fill_rect(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
                        uint32_t argb, uint8_t radius);
 void lhc_enc_border(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
                     uint32_t argb, uint8_t width, uint8_t radius, uint8_t side);
+void lhc_enc_box_shadow(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
+                        uint32_t argb, uint8_t radius, uint8_t blur,
+                        int8_t spread, int16_t ofs_x, int16_t ofs_y, uint8_t bg_cover);
 
 /* Low-level escape hatch (also used by tests). */
 bool lhc_enc_cmd(lhc_enc_t *e, uint8_t opcode, uint8_t flags,

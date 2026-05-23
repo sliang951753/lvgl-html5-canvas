@@ -150,6 +150,21 @@ int main(int argc, char **argv)
     lv_obj_set_style_border_opa(panel_c, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_side(panel_c, LV_BORDER_SIDE_FULL, LV_PART_MAIN);
     lv_obj_set_style_radius(panel_c, 24, LV_PART_MAIN);
+    /* M2: black drop shadow — blur=20, spread=0, offset=(6,8). */
+    lv_obj_set_style_shadow_color(panel_c, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_shadow_opa(panel_c, LV_OPA_60, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(panel_c, 20, LV_PART_MAIN);
+    lv_obj_set_style_shadow_spread(panel_c, 0, LV_PART_MAIN);
+    lv_obj_set_style_shadow_offset_x(panel_c, 6, LV_PART_MAIN);
+    lv_obj_set_style_shadow_offset_y(panel_c, 8, LV_PART_MAIN);
+
+    /* Also throw a soft cyan glow on panel_a so we can see a colored shadow. */
+    lv_obj_set_style_shadow_color(panel_a, lv_color_hex(0x00E5FF), LV_PART_MAIN);
+    lv_obj_set_style_shadow_opa(panel_a, LV_OPA_70, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(panel_a, 24, LV_PART_MAIN);
+    lv_obj_set_style_shadow_spread(panel_a, 2, LV_PART_MAIN);
+    lv_obj_set_style_shadow_offset_x(panel_a, 0, LV_PART_MAIN);
+    lv_obj_set_style_shadow_offset_y(panel_a, 0, LV_PART_MAIN);
 
     /* animated mover */
     lv_obj_t *mover = lv_obj_create(scr);
@@ -171,7 +186,7 @@ int main(int argc, char **argv)
 
     /* label (SW renders glyphs, html5 ignores in M1) */
     lv_obj_t *label = lv_label_create(scr);
-    lv_label_set_text(label, "lvgl-html5-canvas M2 — FILL_RECT + BORDER over WS");
+    lv_label_set_text(label, "lvgl-html5-canvas M2 — FILL + BORDER + BOX_SHADOW over WS");
     lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -30);
 

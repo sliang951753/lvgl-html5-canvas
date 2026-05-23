@@ -26,7 +26,7 @@ except ImportError:
     sys.exit(0)
 
 URI = "ws://127.0.0.1:9000/"
-OP_BEGIN, OP_END, OP_FILL, OP_BORDER = 0x01, 0x02, 0x10, 0x11
+OP_BEGIN, OP_END, OP_FILL, OP_BORDER, OP_BOX_SHADOW = 0x01, 0x02, 0x10, 0x11, 0x13
 N_FRAMES = 20  # enough to catch a 50% drop pattern many times over
 
 EXPECTED_COLORS = {  # (r, g, b) — see main.c demo scene
@@ -90,6 +90,8 @@ def main():
     saw_border = False
     border_sides_seen = set()
     border_payload_lens = set()
+    saw_shadow = False
+    shadow_payload_lens = set()
 
     for i, msg in enumerate(frames):
         try:
@@ -128,12 +130,14 @@ def main():
             seen_colors.add((r, g, b))
 
         for op, _, payload in ops:
-            if op != OP_BORDER:
-                continue
-            saw_border = True
-            border_payload_lens.add(len(payload))
-            if len(payload) >= 15:
-                border_sides_seen.add(payload[14])
+            if op == OP_BORDER:
+                saw_border = True
+                border_payload_lens.add(len(payload))
+                if len(payload) >= 15:
+                    border_sides_seen.add(payload[14])
+            elif op == OP_BOX_SHADOW:
+                saw_shadow = True
+                shadow_payload_lens.add(len(payload))
 
     missing = EXPECTED_COLORS - seen_colors
     if missing:
@@ -142,6 +146,10 @@ def main():
         failures.append("no BORDER op observed — M2 demo borders missing")
     if border_payload_lens and border_payload_lens != {15}:
         failures.append(f"BORDER payload size unexpected: {border_payload_lens} (want {{15}})")
+    if not saw_shadow:
+        failures.append("no BOX_SHADOW op observed — M2 demo shadows missing")
+    if shadow_payload_lens and shadow_payload_lens != {20}:
+        failures.append(f"BOX_SHADOW payload size unexpected: {shadow_payload_lens} (want {{20}})")
 
     if failures:
         print(f"FAIL ({len(failures)} issues over {len(frames)} frames):")
@@ -152,7 +160,8 @@ def main():
     print(
         f"PASS protocol_e2e: {len(frames)} frames, "
         f"all non-empty, fids monotonic, {len(seen_colors)} unique colors, "
-        f"borders={saw_border} sides_seen={sorted(border_sides_seen)}"
+        f"borders={saw_border} sides_seen={sorted(border_sides_seen)} "
+        f"shadows={saw_shadow}"
     )
     return 0
 

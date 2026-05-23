@@ -34,6 +34,7 @@
 #define LHC_OP_FILL_RECT        0x10    /* i16 x,y,w,h; u32 argb; u8 radius (13) */
 #define LHC_OP_BORDER           0x11    /* i16 x,y,w,h; u32 argb; u8 w; u8 r; u8 side (15) */
 #define LHC_OP_LINE             0x12    /* i16 x1,y1,x2,y2; u32 argb; u8 w  (13) */
+#define LHC_OP_BOX_SHADOW       0x13    /* i16 x,y,w,h; u32 argb; u8 radius; u8 blur; i8 spread; i16 ofs_x,ofs_y; u8 bg_cover (20) */
 
 /* @op category: glyph / image */
 #define LHC_OP_GLYPH            0x20    /* i16 x,y; u32 blob_id; u32 argb   (12) */

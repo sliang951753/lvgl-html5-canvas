@@ -121,3 +121,26 @@ void lhc_enc_border(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
     uint8_t flags = ((argb >> 24) != 0xFF) ? LHC_FLAG_HAS_ALPHA_HINT : 0;
     lhc_enc_cmd(e, LHC_OP_BORDER, flags, p, sizeof(p));
 }
+
+void lhc_enc_box_shadow(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
+                        uint32_t argb, uint8_t radius, uint8_t blur,
+                        int8_t spread, int16_t ofs_x, int16_t ofs_y, uint8_t bg_cover)
+{
+    uint8_t p[20];
+    p[0] = (uint8_t)(x & 0xFF);   p[1] = (uint8_t)((x >> 8) & 0xFF);
+    p[2] = (uint8_t)(y & 0xFF);   p[3] = (uint8_t)((y >> 8) & 0xFF);
+    p[4] = (uint8_t)(w & 0xFF);   p[5] = (uint8_t)((w >> 8) & 0xFF);
+    p[6] = (uint8_t)(h & 0xFF);   p[7] = (uint8_t)((h >> 8) & 0xFF);
+    p[8]  = (uint8_t)(argb & 0xFF);
+    p[9]  = (uint8_t)((argb >> 8) & 0xFF);
+    p[10] = (uint8_t)((argb >> 16) & 0xFF);
+    p[11] = (uint8_t)((argb >> 24) & 0xFF);
+    p[12] = radius;
+    p[13] = blur;
+    p[14] = (uint8_t)spread;
+    p[15] = (uint8_t)(ofs_x & 0xFF); p[16] = (uint8_t)((ofs_x >> 8) & 0xFF);
+    p[17] = (uint8_t)(ofs_y & 0xFF); p[18] = (uint8_t)((ofs_y >> 8) & 0xFF);
+    p[19] = bg_cover;
+    /* shadow is almost always semi-transparent -> hint always set */
+    lhc_enc_cmd(e, LHC_OP_BOX_SHADOW, LHC_FLAG_HAS_ALPHA_HINT, p, sizeof(p));
+}

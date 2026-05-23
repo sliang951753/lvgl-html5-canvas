@@ -5,6 +5,7 @@
  *
  * M1: FILL_RECT (solid colour, no gradient).
  * M2: + BORDER (solid colour, any side mask, with radius).
+ *     + BOX_SHADOW (solid color, radius/blur/spread/offset).
  * Begin/End frame is driven from main.c via display REFR_START / REFR_READY
  * events.
  */
@@ -42,6 +43,7 @@ typedef struct {
     uint32_t empty_frames_skipped;
     uint32_t fills_encoded;
     uint32_t borders_encoded;
+    uint32_t shadows_encoded;
 } lhc_html5_stats_t;
 void lhc_html5_draw_unit_get_stats(lhc_html5_stats_t *out);
 
