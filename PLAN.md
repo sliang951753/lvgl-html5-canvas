@@ -102,8 +102,14 @@ LRU on both ends; capacity ~4 MB browser, ~256 KB board (configurable).
 - [x] BORDER (0x11): solid colour, full/partial sides, radius, alpha hint;
       demo panels carry full + top/bottom + thick-rounded variants;
       `test_encoder::border_payload` + e2e BORDER-presence assertion
+- [x] BOX_SHADOW (0x13): solid colour, radius/blur/spread/offset, bg_cover;
+      encoder + viewer replay + tests
+- [x] IMAGE (0x21) + BLOB_UPLOAD (0x40): blob cache/LRU + periodic refresh,
+      ARGB8888/XRGB8888 path, demo sprites, encoder/e2e coverage
+- [x] LAYER (LV_DRAW_TASK_TYPE_LAYER): replay as IMAGE over layer draw_buf
+      for simple non-transformed blends
 - [ ] LINE (0x12)
-- [ ] GLYPH (0x21) + BLOB_UPLOAD (0x40) — glyph cache (board hash,
+- [ ] GLYPH (0x20) + BLOB_UPLOAD (0x40) — glyph cache (board hash,
       browser Map+LRU); demo text labels
 - **tag**: `v0.3.0-m2` (deferred until LINE + GLYPH land)
 

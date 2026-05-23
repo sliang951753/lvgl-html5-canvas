@@ -153,6 +153,34 @@ static bool image_is_simple(const lv_draw_image_dsc_t *d)
     return true;
 }
 
+/* LAYER task uses lv_draw_image_dsc_t too, but d->src is lv_layer_t*.
+ * We only claim simple, non-transformed layer blends whose backing draw_buf
+ * is ARGB8888/XRGB8888 and fits our M2 image size cap. */
+static bool layer_is_simple(const lv_draw_image_dsc_t *d)
+{
+    if (!d) return false;
+    if (d->opa == 0) return false;
+    if (d->rotation != 0) return false;
+    if (d->scale_x != LV_SCALE_NONE || d->scale_y != LV_SCALE_NONE) return false;
+    if (d->skew_x != 0 || d->skew_y != 0) return false;
+    if (d->tile) return false;
+    if (d->bitmap_mask_src) return false;
+    if (d->recolor_opa != 0) return false;
+    if (d->clip_radius != 0) return false;
+    if (!d->src) return false;
+
+    const lv_layer_t *layer = (const lv_layer_t *)d->src;
+    const lv_draw_buf_t *buf = layer->draw_buf;
+    if (!buf || !buf->data) return false;
+    if (buf->header.magic != LV_IMAGE_HEADER_MAGIC) return false;
+    if (buf->header.cf != LV_COLOR_FORMAT_ARGB8888 &&
+        buf->header.cf != LV_COLOR_FORMAT_XRGB8888) return false;
+    if (buf->header.w == 0 || buf->header.h == 0) return false;
+    if (buf->header.w > LHC_IMG_MAX_DIM || buf->header.h > LHC_IMG_MAX_DIM) return false;
+    if (buf->data_size == 0) return false;
+    return true;
+}
+
 /* Find slot for this src; allocate via LRU if absent. Returns NULL on
  * out-of-cache (caller falls back to SW). Computes blob_id on insert. */
 static lhc_blob_slot_t *blob_cache_get_or_insert(const lv_image_dsc_t *img)
@@ -268,6 +296,9 @@ static int32_t lhc_evaluate_cb(lv_draw_unit_t *du, lv_draw_task_t *task)
     } else if (task->type == LV_DRAW_TASK_TYPE_IMAGE) {
         const lv_draw_image_dsc_t *d = (const lv_draw_image_dsc_t *)task->draw_dsc;
         if (!image_is_simple(d)) return 0;
+    } else if (task->type == LV_DRAW_TASK_TYPE_LAYER) {
+        const lv_draw_image_dsc_t *d = (const lv_draw_image_dsc_t *)task->draw_dsc;
+        if (!layer_is_simple(d)) return 0;
     } else {
         return 0;
     }
@@ -332,12 +363,21 @@ static int32_t lhc_dispatch_cb(lv_draw_unit_t *du, lv_layer_t *layer)
                                (uint8_t)(d->bg_cover ? 1 : 0));
             g_ops_this_frame++;
             g_stats.shadows_encoded++;
-        } else if (t->type == LV_DRAW_TASK_TYPE_IMAGE) {
+        } else if (t->type == LV_DRAW_TASK_TYPE_IMAGE ||
+                   t->type == LV_DRAW_TASK_TYPE_LAYER) {
             const lv_draw_image_dsc_t *d = (const lv_draw_image_dsc_t *)t->draw_dsc;
-            const lv_image_dsc_t *img = (const lv_image_dsc_t *)d->src;
+            const lv_image_dsc_t *img = NULL;
+            if (t->type == LV_DRAW_TASK_TYPE_IMAGE) {
+                img = (const lv_image_dsc_t *)d->src;
+            } else {
+                const lv_layer_t *ly = (const lv_layer_t *)d->src;
+                img = (const lv_image_dsc_t *)ly->draw_buf;
+            }
             lhc_blob_slot_t *slot = blob_cache_get_or_insert(img);
             /* Use the original image_area coords (LVGL clips coords to the
-             * dirty rectangle which would chop our blit). */
+             * dirty rectangle which would chop our blit). For LAYER tasks
+             * LVGL also uses lv_draw_image_dsc_t and image_area carries the
+             * original blending area. */
             int16_t ix = (int16_t)d->image_area.x1;
             int16_t iy = (int16_t)d->image_area.y1;
             int16_t iw = (int16_t)(d->image_area.x2 - d->image_area.x1 + 1);
@@ -345,7 +385,8 @@ static int32_t lhc_dispatch_cb(lv_draw_unit_t *du, lv_layer_t *layer)
             if (slot && blob_ensure_uploaded(slot, img)) {
                 lhc_enc_image(&g_enc, ix, iy, iw, ih, slot->blob_id);
                 g_ops_this_frame++;
-                g_stats.images_encoded++;
+                if (t->type == LV_DRAW_TASK_TYPE_IMAGE) g_stats.images_encoded++;
+                else g_stats.layers_encoded++;
             }
         }
 
@@ -384,7 +425,7 @@ void lhc_html5_draw_unit_init(void)
     g_unit->base.delete_cb   = lhc_delete_cb;
     memset(&g_stats, 0, sizeof(g_stats));
     memset(g_blobs, 0, sizeof(g_blobs));
-    LV_LOG_INFO("lhc: html5 draw unit registered (M2c: FILL/BORDER/SHADOW/IMAGE, score=80)");
+    LV_LOG_INFO("lhc: html5 draw unit registered (M2d: +LAYER over M2c FILL/BORDER/SHADOW/IMAGE, score=80)");
 }
 
 void lhc_html5_draw_unit_attach_ws(lhc_ws_server_t *srv)
