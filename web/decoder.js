@@ -57,6 +57,15 @@ export const Decoders = {
     argb: p.getUint32(8, true) >>> 0,
     width: p.getUint8(12),
   }),
+  [Proto.OP_LINE_EX]:     (p) => ({
+    x1: p.getInt16(0, true), y1: p.getInt16(2, true),
+    x2: p.getInt16(4, true), y2: p.getInt16(6, true),
+    argb: p.getUint32(8, true) >>> 0,
+    width: p.getUint8(12),
+    dash_width: p.getUint8(13),
+    dash_gap: p.getUint8(14),
+    cap_bits: p.getUint8(15),
+  }),
   [Proto.OP_ARC]:         (p) => ({
     cx: p.getInt16(0, true), cy: p.getInt16(2, true),
     r: p.getUint16(4, true),

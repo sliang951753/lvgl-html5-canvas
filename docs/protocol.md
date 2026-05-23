@@ -66,6 +66,7 @@ Decoders MUST skip unknown opcodes by advancing `4 + payload_len` bytes.
 | 0x11   | BORDER        | S → V     | 15 bytes |
 | 0x12   | LINE          | S → V     | 13 bytes (`i16 x1,y1,x2,y2; u32 argb; u8 width`) |
 | 0x13   | BOX_SHADOW    | S → V     | 20 bytes |
+| 0x14   | LINE_EX       | S → V     | 16 bytes (`i16 x1,y1,x2,y2; u32 argb; u8 width; u8 dash_w; u8 dash_gap; u8 cap_bits`) |
 | 0x21   | IMAGE         | S → V     | 12 bytes |
 | 0x40   | BLOB_UPLOAD   | S → V     | variable (`9 + data_len`) |
 | 0x41   | BLOB_EVICT    | S → V     | 4 bytes |
@@ -115,9 +116,29 @@ This was a real bug source during M1; the e2e test now pins it.
 | 8      | 4    | `argb`  | u32 LE bytes = `[B, G, R, A]` |
 | 12     | 1    | `width` | u8, line width in px |
 
-Current M3a/M3c server emits LINE for non-dashed butt-cap line tasks,
-including both direct `p1/p2` and polyline `points[]` segments.
-Dashed or rounded-cap variants still fall back to LVGL SW draw unit.
+Current M3a/M3c server emits LINE for baseline line tasks (direct `p1/p2`
+or polyline `points[]`). When dash or round-cap styles are present, M3d
+emits LINE_EX with dash/cap metadata.
+
+---
+
+### LINE_EX payload (16 bytes)
+
+| Offset | Size | Field      | Notes |
+|-------:|-----:|------------|-------|
+| 0      | 2    | `x1`       | i16 LE, start point x |
+| 2      | 2    | `y1`       | i16 LE, start point y |
+| 4      | 2    | `x2`       | i16 LE, end point x |
+| 6      | 2    | `y2`       | i16 LE, end point y |
+| 8      | 4    | `argb`     | u32 LE bytes = `[B, G, R, A]` |
+| 12     | 1    | `width`    | u8, line width in px |
+| 13     | 1    | `dash_w`   | u8, dash segment length (0 = no dash) |
+| 14     | 1    | `dash_gap` | u8, dash gap length (0 = no dash) |
+| 15     | 1    | `cap_bits` | bit0=round_start, bit1=round_end |
+
+Viewer mapping:
+- if `dash_w > 0 && dash_gap > 0` -> `ctx.setLineDash([dash_w, dash_gap])`
+- if `cap_bits != 0` -> `ctx.lineCap='round'`, else `'butt'`
 
 ---
 

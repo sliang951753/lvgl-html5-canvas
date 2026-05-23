@@ -9,8 +9,9 @@
  *    REFR_READY display events, then the buffer is broadcast over WS.
  *
  * M3a extension: claim and encode simple LV_DRAW_TASK_TYPE_LINE tasks
- * (non-dashed, butt-cap; supports p1/p2 and polyline points[] segments)
- * as OP_LINE (0x12).
+ * (supports p1/p2 and polyline points[] segments) as OP_LINE (0x12).
+ * M3d extension: when dash/round-cap styles are present, encode as
+ * OP_LINE_EX (0x14) with dash/cap metadata for Canvas2D replay.
  * M3b extension: claim and encode simple LV_DRAW_TASK_TYPE_ARC tasks
  * (solid-color stroke only, no image-source arcs) as OP_ARC (0x22).
  *
@@ -138,12 +139,8 @@ static bool line_is_simple(const lv_draw_line_dsc_t *d)
     if (!d) return false;
     if (d->opa == 0) return false;
     if (d->width <= 0) return false;
-    if (d->dash_width != 0 || d->dash_gap != 0) return false;
-    /* Round caps need style bits we don't carry in OP_LINE yet. */
-    if (d->round_start || d->round_end) return false;
 
-    /* M3c: support both direct (p1/p2) and polyline-backed (points[])
-     * non-dashed, butt-cap paths. */
+    /* M3d: support both plain LINE and LINE_EX (dash/round caps). */
     if (d->points && d->point_cnt < 2) return false;
     return true;
 }
@@ -409,6 +406,9 @@ static int32_t lhc_dispatch_cb(lv_draw_unit_t *du, lv_layer_t *layer)
             uint32_t opa = (uint32_t)d->opa * (uint32_t)t->opa / 255u;
             uint32_t argb = color_to_argb(d->color, (lv_opa_t)opa);
             int32_t lw = d->width; if (lw < 1) lw = 1; if (lw > 255) lw = 255;
+            uint8_t dash_w = (d->dash_width <= 0) ? 0 : (d->dash_width > 255 ? 255 : (uint8_t)d->dash_width);
+            uint8_t dash_g = (d->dash_gap <= 0) ? 0 : (d->dash_gap > 255 ? 255 : (uint8_t)d->dash_gap);
+            uint8_t cap_bits = (uint8_t)((d->round_start ? 0x1 : 0x0) | (d->round_end ? 0x2 : 0x0));
 
             if (d->points && d->point_cnt >= 2) {
                 for (int32_t i = 0; i < d->point_cnt - 1; i++) {
@@ -416,10 +416,17 @@ static int32_t lhc_dispatch_cb(lv_draw_unit_t *du, lv_layer_t *layer)
                     const lv_point_precise_t p1 = d->points[i + 1];
                     if (p0.x == LV_DRAW_LINE_POINT_NONE || p0.y == LV_DRAW_LINE_POINT_NONE) continue;
                     if (p1.x == LV_DRAW_LINE_POINT_NONE || p1.y == LV_DRAW_LINE_POINT_NONE) continue;
-                    lhc_enc_line(&g_enc,
-                                 (int16_t)p0.x, (int16_t)p0.y,
-                                 (int16_t)p1.x, (int16_t)p1.y,
-                                 argb, (uint8_t)lw);
+                    if (dash_w == 0 && dash_g == 0 && cap_bits == 0) {
+                        lhc_enc_line(&g_enc,
+                                     (int16_t)p0.x, (int16_t)p0.y,
+                                     (int16_t)p1.x, (int16_t)p1.y,
+                                     argb, (uint8_t)lw);
+                    } else {
+                        lhc_enc_line_ex(&g_enc,
+                                        (int16_t)p0.x, (int16_t)p0.y,
+                                        (int16_t)p1.x, (int16_t)p1.y,
+                                        argb, (uint8_t)lw, dash_w, dash_g, cap_bits);
+                    }
                     g_ops_this_frame++;
                     g_stats.lines_encoded++;
                     if (g_enc.overflow) break;
@@ -429,7 +436,12 @@ static int32_t lhc_dispatch_cb(lv_draw_unit_t *du, lv_layer_t *layer)
                 int16_t y1 = (int16_t)d->p1.y;
                 int16_t x2 = (int16_t)d->p2.x;
                 int16_t y2 = (int16_t)d->p2.y;
-                lhc_enc_line(&g_enc, x1, y1, x2, y2, argb, (uint8_t)lw);
+                if (dash_w == 0 && dash_g == 0 && cap_bits == 0) {
+                    lhc_enc_line(&g_enc, x1, y1, x2, y2, argb, (uint8_t)lw);
+                } else {
+                    lhc_enc_line_ex(&g_enc, x1, y1, x2, y2, argb, (uint8_t)lw,
+                                    dash_w, dash_g, cap_bits);
+                }
                 g_ops_this_frame++;
                 g_stats.lines_encoded++;
             }

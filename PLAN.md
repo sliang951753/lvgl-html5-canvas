@@ -112,7 +112,7 @@ LRU on both ends; capacity ~4 MB browser, ~256 KB board (configurable).
       end-to-end (encoder/draw-unit/viewer/demo/tests)
 - [x] ARC (0x22): color-only arc stroke fast path
       end-to-end (encoder/draw-unit/viewer/demo/tests)
-- [~] LINE advanced shapes (polyline iterator done; dash / round caps pending)
+- [~] LINE advanced shapes (polyline done; dash / round caps in-progress via LINE_EX 0x14)
 - [ ] GLYPH (0x20) + BLOB_UPLOAD (0x40) — glyph cache (board hash,
       browser Map+LRU); demo text labels
 - **tag**: `v0.3.0-m2` (deferred until LINE + GLYPH land)

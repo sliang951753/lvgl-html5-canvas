@@ -220,6 +220,35 @@ static int test_arc_payload(void)
     return 0;
 }
 
+static int test_line_ex_payload(void)
+{
+    uint8_t buf[1024];
+    lhc_enc_t e;
+    lhc_enc_init(&e, buf, sizeof(buf));
+    lhc_enc_begin_frame(&e, 0, 100, 100);
+    /* line_ex: (5,6)->(70,80), semi-alpha, w=4, dash(9,3), round both ends */
+    lhc_enc_line_ex(&e, 5, 6, 70, 80, 0x80AA5500u, 4, 9, 3, 0x03);
+    lhc_enc_end_frame(&e);
+    size_t n = lhc_enc_finalize(&e);
+    CHECK(n > 0, "no overflow");
+    CHECK(e.cmd_count == 3, "3 cmds");
+    const uint8_t *p = buf + 12;
+    CHECK(p[0] == LHC_OP_LINE_EX, "LINE_EX opcode");
+    CHECK((p[1] & LHC_FLAG_HAS_ALPHA_HINT) != 0, "alpha hint set");
+    CHECK(p[2] == 16 && p[3] == 0, "payload_len=16");
+    CHECK(p[4] == 5 && p[5] == 0, "x1 LE");
+    CHECK(p[6] == 6 && p[7] == 0, "y1 LE");
+    CHECK(p[8] == 70 && p[9] == 0, "x2 LE");
+    CHECK(p[10] == 80 && p[11] == 0, "y2 LE");
+    /* argb 0x80AA5500 LE -> 00 55 AA 80 */
+    CHECK(p[12] == 0x00 && p[13] == 0x55 && p[14] == 0xAA && p[15] == 0x80, "argb LE");
+    CHECK(p[16] == 4, "line width");
+    CHECK(p[17] == 9, "dash_width");
+    CHECK(p[18] == 3, "dash_gap");
+    CHECK(p[19] == 0x03, "cap_bits");
+    return 0;
+}
+
 static int test_box_shadow_payload(void)
 {
     uint8_t buf[1024];
@@ -303,6 +332,7 @@ int main(void)
         { "border_payload",      test_border_payload },
         { "line_payload",        test_line_payload },
         { "arc_payload",         test_arc_payload },
+        { "line_ex_payload",     test_line_ex_payload },
         { "box_shadow_payload",  test_box_shadow_payload },
         { "image_and_blob_payload", test_image_and_blob_payload },
     };

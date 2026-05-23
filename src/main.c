@@ -318,6 +318,18 @@ int main(int argc, char **argv)
     lv_obj_set_style_line_color(line_d, lv_color_hex(0xFFCA28), LV_PART_MAIN);
     lv_obj_set_style_line_opa(line_d, LV_OPA_90, LV_PART_MAIN);
 
+    static lv_point_precise_t line_case_dash[] = { {6, 108}, {236, 108} };
+    lv_obj_t *line_dash = lv_line_create(line_case);
+    lv_line_set_points_mutable(line_dash, line_case_dash, 2);
+    lv_obj_set_size(line_dash, 240, 20);
+    lv_obj_set_pos(line_dash, 4, 4);
+    lv_obj_set_style_line_width(line_dash, 4, LV_PART_MAIN);
+    lv_obj_set_style_line_color(line_dash, lv_color_hex(0x80CBC4), LV_PART_MAIN);
+    lv_obj_set_style_line_opa(line_dash, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_line_dash_width(line_dash, 8, LV_PART_MAIN);
+    lv_obj_set_style_line_dash_gap(line_dash, 5, LV_PART_MAIN);
+    lv_obj_set_style_line_rounded(line_dash, true, LV_PART_MAIN);
+
     /* M3b ARC case: dedicated arc widget card to visualize OP_ARC replay. */
     lv_obj_t *arc_case = lv_obj_create(scr);
     lv_obj_remove_style_all(arc_case);
@@ -423,6 +435,9 @@ int main(int argc, char **argv)
     lv_obj_set_style_line_width(line_c, 3, LV_PART_MAIN);
     lv_obj_set_style_line_color(line_c, lv_color_hex(0xB2FF59), LV_PART_MAIN);
     lv_obj_set_style_line_opa(line_c, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_line_dash_width(line_c, 10, LV_PART_MAIN);
+    lv_obj_set_style_line_dash_gap(line_c, 6, LV_PART_MAIN);
+    lv_obj_set_style_line_rounded(line_c, true, LV_PART_MAIN);
 
     /* animate one LINE endpoint to prove live LINE task replay */
     lv_anim_t a4;
@@ -437,7 +452,7 @@ int main(int argc, char **argv)
 
     /* label (SW renders glyphs, html5 ignores in M1) */
     lv_obj_t *label = lv_label_create(scr);
-    lv_label_set_text(label, "lvgl-html5-canvas M3b — +ARC over WS (label still SW)");
+    lv_label_set_text(label, "lvgl-html5-canvas M3d — +LINE_EX dash/caps over WS (label still SW)");
     lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -30);
 

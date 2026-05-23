@@ -26,7 +26,7 @@ except ImportError:
     sys.exit(0)
 
 URI = "ws://127.0.0.1:9000/"
-OP_BEGIN, OP_END, OP_FILL, OP_BORDER, OP_LINE, OP_BOX_SHADOW, OP_IMAGE, OP_BLOB_UPLOAD, OP_ARC = 0x01, 0x02, 0x10, 0x11, 0x12, 0x13, 0x21, 0x40, 0x22
+OP_BEGIN, OP_END, OP_FILL, OP_BORDER, OP_LINE, OP_BOX_SHADOW, OP_LINE_EX, OP_IMAGE, OP_BLOB_UPLOAD, OP_ARC = 0x01, 0x02, 0x10, 0x11, 0x12, 0x13, 0x14, 0x21, 0x40, 0x22
 N_FRAMES = 20  # enough to catch a 50% drop pattern many times over
 
 EXPECTED_COLORS = {  # (r, g, b) — see main.c demo scene
@@ -148,6 +148,9 @@ def main():
             elif op == OP_LINE:
                 saw_line = True
                 line_payload_lens.add(len(payload))
+            elif op == OP_LINE_EX:
+                saw_line = True
+                line_payload_lens.add(len(payload))
             elif op == OP_ARC:
                 saw_arc = True
                 arc_payload_lens.add(len(payload))
@@ -178,8 +181,8 @@ def main():
         failures.append(f"BORDER payload size unexpected: {border_payload_lens} (want {{15}})")
     if not saw_line:
         failures.append("no LINE op observed — M3a/M3c line replay missing")
-    if line_payload_lens and line_payload_lens != {13}:
-        failures.append(f"LINE payload size unexpected: {line_payload_lens} (want {{13}})")
+    if line_payload_lens and (line_payload_lens - {13, 16}):
+        failures.append(f"LINE payload size unexpected: {line_payload_lens} (want subset of {{13,16}})")
     if not saw_arc:
         failures.append("no ARC op observed — M3b arc replay missing")
     if arc_payload_lens and arc_payload_lens != {15}:

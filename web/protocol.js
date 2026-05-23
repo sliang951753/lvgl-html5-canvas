@@ -18,6 +18,8 @@ export const Proto = Object.freeze({
   OP_LINE: 0x12,
   /** i16 x,y,w,h; u32 argb; u8 radius; u8 blur; i8 spread; i16 ofs_x,ofs_y; u8 bg_cover (20) */
   OP_BOX_SHADOW: 0x13,
+  /** i16 x1,y1,x2,y2; u32 argb; u8 w; u8 dash_w; u8 dash_gap; u8 cap_bits (16) */
+  OP_LINE_EX: 0x14,
   /** i16 x,y; u32 blob_id; u32 argb   (12) */
   OP_GLYPH: 0x20,
   /** i16 x,y,w,h; u32 blob_id         (12) */

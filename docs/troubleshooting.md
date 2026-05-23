@@ -65,17 +65,18 @@ diagnostic lives. Our viewer logs both since v0.2.0-m1.
 **Symptom:** After M3a rollout, line widgets are visible but runtime stats
 show `lines=0`.
 
-**Cause:** Current LINE fast path claims non-dashed, butt-cap lines only:
-- `dash_width == 0` and `dash_gap == 0`
-- `round_start == 0` and `round_end == 0`
-- direct `p1/p2` and polyline `points[]` are both supported
+**Cause:** Current LINE fast path encodes two wire forms:
+- `OP_LINE` for baseline line tasks
+- `OP_LINE_EX` when dash/round-cap styles are present
 
-Dashed/rounded-cap variants intentionally fall back to SW for now.
+Both forms support direct `p1/p2` and polyline `points[]` segments.
 
 **Fix:**
-1. Validate with either a 2-point line or a polyline widget (no dash/no round cap).
-2. Confirm `lines=` counter rises in `~/lhc.log`.
-3. Keep dashed/rounded line styles in demo as explicit SW fallback coverage.
+1. Validate baseline lines first (`OP_LINE`, payload 13).
+2. Validate dashed or rounded lines (`OP_LINE_EX`, payload 16).
+3. Confirm `lines=` counter rises in `~/lhc.log`.
+4. If lines still fallback to SW, inspect `dash_width/dash_gap/line_rounded`
+   style values emitted by LVGL at runtime.
 
 ### ARC capability appears missing / `arcs=0` in stats
 **Symptom:** After M3b rollout, arc widgets are visible via SW fallback but runtime stats

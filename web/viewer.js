@@ -184,12 +184,30 @@ function renderFrame(frame) {
         const d = Decoders[cmd.opcode](cmd.payload);
         ctx.strokeStyle = argbToCss(d.argb);
         ctx.lineWidth = Math.max(1, d.width);
+        ctx.setLineDash([]);
         ctx.lineCap = 'butt';
         ctx.lineJoin = 'miter';
         ctx.beginPath();
         ctx.moveTo(d.x1, d.y1);
         ctx.lineTo(d.x2, d.y2);
         ctx.stroke();
+        break;
+      }
+      case Proto.OP_LINE_EX: {
+        const d = Decoders[cmd.opcode](cmd.payload);
+        ctx.strokeStyle = argbToCss(d.argb);
+        ctx.lineWidth = Math.max(1, d.width);
+        if (d.dash_width > 0 && d.dash_gap > 0) ctx.setLineDash([d.dash_width, d.dash_gap]);
+        else ctx.setLineDash([]);
+        const roundStart = (d.cap_bits & 0x1) !== 0;
+        const roundEnd = (d.cap_bits & 0x2) !== 0;
+        ctx.lineCap = (roundStart || roundEnd) ? 'round' : 'butt';
+        ctx.lineJoin = 'miter';
+        ctx.beginPath();
+        ctx.moveTo(d.x1, d.y1);
+        ctx.lineTo(d.x2, d.y2);
+        ctx.stroke();
+        ctx.setLineDash([]);
         break;
       }
       case Proto.OP_ARC: {
