@@ -10,9 +10,9 @@
    │                                              │              ┌──────────────────┐ │
    │                                  REFR_START  │              │ html5_draw_unit  │ │
    │                                  REFR_READY  ▼              │ (id=50, score=80)│ │
-   │                                      ┌────────────┐         │  - claims FILL   │ │
-   │                                      │ begin_frame│         │  - encodes ops   │ │
-   │                                      │ flush_frame│◀────────┤  - skip empty    │ │
+   │                                      ┌────────────┐         │  - claims FILL/  │ │
+   │                                      │ begin_frame│         │    BORDER/SHADOW │ │
+   │                                      │ flush_frame│◀────────┤    IMAGE/LAYER   │ │
    │                                      └─────┬──────┘         └────────┬─────────┘ │
    │                                            │ broadcast(buf,n)        │           │
    │                                            ▼                         │           │
@@ -58,12 +58,14 @@ Hand-off between the threads:
    `lhc_html5_draw_unit_begin_frame(w, h)`, resetting the encoder and
    `fills_this_frame = 0`.
 2. LVGL builds the task list and asks every draw unit to `evaluate()`.
-   The html5 unit returns `1` for solid FILL tasks with `score = 80`
-   (beats SW's 100), claiming them.
+   The html5 unit returns `1` for a constrained subset of task types
+   (currently FILL / BORDER / BOX_SHADOW / IMAGE / LAYER) with
+   `score = 80` (beats SW's 100), claiming them.
 3. LVGL repeatedly calls `dispatch()` on each unit. We encode each
-   claimed task as a `FILL_RECT` op and mark it `FINISHED`. The SW unit
-   continues to render anything we didn't claim into the dummy
-   framebuffer (which the dummy flush_cb then discards).
+   claimed task as protocol ops (`FILL_RECT`, `BORDER`, `BOX_SHADOW`,
+   `IMAGE`, plus blob management for image/layer sources) and mark it
+   `FINISHED`. The SW unit continues to render anything we didn't claim
+   into the dummy framebuffer (which the dummy flush_cb then discards).
 4. LVGL emits `LV_EVENT_REFR_READY` → `flush_frame()`:
    - If `fills_this_frame == 0`, the frame is **dropped silently**
      (no broadcast, `empty_frames_skipped++`). See `docs/protocol.md` §3.
@@ -76,6 +78,18 @@ Lower score wins. We pick 80 so future units (e.g. an OpenGL-accelerated
 one) can pick a lower number and beat us for the same op, without us
 having to rewire the protocol.
 
+## Runtime observability (M2d)
+
+`main.c` prints one compact stats line per second:
+
+- `eval`, `disp`, `taken`, `frames`
+- per-op encoded counters: `fills`, `borders`, `shadows`, `images`, `layers`
+- blob traffic: `blobs`, `blobKB`
+
+Use these counters to confirm capability deltas quickly without pixel
+inspection. Example: after enabling the layered-opacity demo widget,
+`layers` should increase continuously (non-zero slope).
+
 ## File map
 
 | Path                          | Role                                   |
@@ -87,6 +101,6 @@ having to rewire the protocol.
 | `src/transport/ws_server.{h,c}`  | libwebsockets server + service thread + ring buffer |
 | `scripts/gen_js_protocol.py`  | Generates `web/protocol.js` from `protocol.h` |
 | `web/decoder.js`              | (generated) opcode constants            |
-| `web/viewer.js`               | Canvas2D replayer, drives `ctx.fillRect` |
-| `tests/test_encoder.c`        | Byte-level encoder unit tests (6 cases) |
-| `tests/test_protocol_e2e.py`  | Spawns the binary, asserts no empty frames + correct colours |
+| `web/viewer.js`               | Canvas2D replayer (`fillRect`/border/shadow/image + blob cache) |
+| `tests/test_encoder.c`        | Byte-level encoder unit tests (fill/border/shadow/image/blob) |
+| `tests/test_protocol_e2e.py`  | Spawns binary, validates frame structure + M2 op presence |

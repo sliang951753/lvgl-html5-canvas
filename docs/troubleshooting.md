@@ -61,6 +61,21 @@ diagnostic lives. Our viewer logs both since v0.2.0-m1.
 
 ## Server-side issues
 
+### LAYER capability appears ineffective / `layers=0` in stats
+**Symptom:** After M2d, visual output seems unchanged and runtime stats
+show `layers=0` while other counters move.
+
+**Cause:** Current M2d implementation reuses IMAGE/blob fast path for
+`LV_DRAW_TASK_TYPE_LAYER` and keeps the same source-dimension gate
+(`LHC_IMG_MAX_DIM`, default 128). If the layered offscreen buffer exceeds
+that cap, the task falls back to SW and no layer op is encoded.
+
+**Fix:**
+1. Keep the validation layered object within cap (current demo uses 120×100).
+2. Watch per-second stats in `~/lhc.log`: `layers=` must increase.
+3. If larger layers are required, raise the cap deliberately and re-check
+   frame size / blob traffic pressure before enabling by default.
+
 ### Frames flicker between content and pure black
 **Symptom (pre-v0.2.0-m1):** Even frame IDs show 5 fills, odd ones
 show 0 fills.

@@ -56,16 +56,25 @@ Decoders MUST skip unknown opcodes by advancing `4 + payload_len` bytes.
 
 ---
 
-## 2. Opcodes (v0 / M1)
+## 2. Opcodes (v0 / M2d)
 
 | Opcode | Name          | Direction | Payload |
 |-------:|---------------|-----------|---------|
 | 0x01   | BEGIN_FRAME   | S → V     | 4 bytes: `u16 w, u16 h` |
-| 0x02   | END_FRAME     | S → V     | 0 bytes  |
-| 0x10   | FILL_RECT     | S → V     | 13 bytes (see below) |
+| 0x02   | END_FRAME     | S → V     | 0 bytes |
+| 0x10   | FILL_RECT     | S → V     | 13 bytes |
+| 0x11   | BORDER        | S → V     | 15 bytes |
+| 0x13   | BOX_SHADOW    | S → V     | 20 bytes |
+| 0x21   | IMAGE         | S → V     | 12 bytes |
+| 0x40   | BLOB_UPLOAD   | S → V     | variable (`9 + data_len`) |
+| 0x41   | BLOB_EVICT    | S → V     | 4 bytes |
 
-Every frame **must** start with BEGIN_FRAME and end with END_FRAME. The
-M1 server only ever emits these three opcodes.
+Every frame **must** start with BEGIN_FRAME and end with END_FRAME.
+Unknown future opcodes must still be skipped via `payload_len`.
+
+> Note (M2d): `LV_DRAW_TASK_TYPE_LAYER` currently reuses the IMAGE/blob path
+> and is therefore emitted on-wire as `BLOB_UPLOAD + IMAGE` (no dedicated
+> `OP_LAYER` yet).
 
 ### FILL_RECT payload (13 bytes)
 

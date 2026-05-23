@@ -94,6 +94,8 @@ def main():
     shadow_payload_lens = set()
     saw_image = False
     image_payload_lens = set()
+    layer_like_image_count = 0
+    layer_like_x_positions = set()
     saw_blob_upload = False
     blob_payload_lens = set()
 
@@ -145,6 +147,14 @@ def main():
             elif op == OP_IMAGE:
                 saw_image = True
                 image_payload_lens.add(len(payload))
+                if len(payload) >= 12:
+                    x, y, w_i, h_i, blob_id = struct.unpack_from("<hhhhI", payload, 0)
+                    # M2d demo signature: layered host is animated around x≈600..670
+                    # and uses an offscreen layer roughly 120x100 (within current cap).
+                    # We treat this as a "layer-like" image replay witness.
+                    if w_i == 120 and h_i == 100 and 560 <= x <= 700:
+                        layer_like_image_count += 1
+                        layer_like_x_positions.add(x)
             elif op == OP_BLOB_UPLOAD:
                 saw_blob_upload = True
                 blob_payload_lens.add(len(payload))
@@ -164,6 +174,16 @@ def main():
         failures.append("no IMAGE op observed — M2c image replay missing")
     if image_payload_lens and image_payload_lens != {12}:
         failures.append(f"IMAGE payload size unexpected: {image_payload_lens} (want {{12}})")
+    if layer_like_image_count < 5:
+        failures.append(
+            "no stable layer-like IMAGE replay observed — M2d regression "
+            f"(count={layer_like_image_count}, x_seen={sorted(layer_like_x_positions)[:6]})"
+        )
+    elif len(layer_like_x_positions) < 2:
+        failures.append(
+            "layer-like IMAGE replay not moving as expected — demo observability regression "
+            f"(x_seen={sorted(layer_like_x_positions)})"
+        )
     # BLOB_UPLOAD may or may not appear in this 20-frame window: if the viewer
     # connects after the initial upload and before refresh-period re-upload,
     # IMAGE ops can still appear while blob uploads are absent. So we only
@@ -179,7 +199,9 @@ def main():
         f"PASS protocol_e2e: {len(frames)} frames, "
         f"all non-empty, fids monotonic, {len(seen_colors)} unique colors, "
         f"borders={saw_border} sides_seen={sorted(border_sides_seen)} "
-        f"shadows={saw_shadow} images={saw_image} blobs_seen={saw_blob_upload}"
+        f"shadows={saw_shadow} images={saw_image} "
+        f"layer_like={layer_like_image_count} x_span={sorted(layer_like_x_positions)[:4]} "
+        f"blobs_seen={saw_blob_upload}"
     )
     return 0
 
