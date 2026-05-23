@@ -119,6 +119,12 @@ int main(int argc, char **argv)
     lv_obj_set_pos(panel_a, 40, 60);
     lv_obj_set_style_bg_color(panel_a, lv_color_hex(0xE53935), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(panel_a, LV_OPA_COVER, LV_PART_MAIN);
+    /* M2: full white border, 4px, with radius matching the panel. */
+    lv_obj_set_style_border_color(panel_a, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_border_width(panel_a, 4, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(panel_a, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_side(panel_a, LV_BORDER_SIDE_FULL, LV_PART_MAIN);
+    lv_obj_set_style_radius(panel_a, 8, LV_PART_MAIN);
 
     lv_obj_t *panel_b = lv_obj_create(scr);
     lv_obj_remove_style_all(panel_b);
@@ -126,6 +132,11 @@ int main(int argc, char **argv)
     lv_obj_set_pos(panel_b, 280, 60);
     lv_obj_set_style_bg_color(panel_b, lv_color_hex(0x43A047), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(panel_b, LV_OPA_COVER, LV_PART_MAIN);
+    /* M2: yellow top+bottom border only (partial-side path). */
+    lv_obj_set_style_border_color(panel_b, lv_color_hex(0xFFEB3B), LV_PART_MAIN);
+    lv_obj_set_style_border_width(panel_b, 6, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(panel_b, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_side(panel_b, LV_BORDER_SIDE_TOP | LV_BORDER_SIDE_BOTTOM, LV_PART_MAIN);
 
     lv_obj_t *panel_c = lv_obj_create(scr);
     lv_obj_remove_style_all(panel_c);
@@ -133,6 +144,12 @@ int main(int argc, char **argv)
     lv_obj_set_pos(panel_c, 520, 60);
     lv_obj_set_style_bg_color(panel_c, lv_color_hex(0x1E88E5), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(panel_c, LV_OPA_COVER, LV_PART_MAIN);
+    /* M2: orange thick rounded full border. */
+    lv_obj_set_style_border_color(panel_c, lv_color_hex(0xFF9800), LV_PART_MAIN);
+    lv_obj_set_style_border_width(panel_c, 8, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(panel_c, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_side(panel_c, LV_BORDER_SIDE_FULL, LV_PART_MAIN);
+    lv_obj_set_style_radius(panel_c, 24, LV_PART_MAIN);
 
     /* animated mover */
     lv_obj_t *mover = lv_obj_create(scr);
@@ -154,7 +171,7 @@ int main(int argc, char **argv)
 
     /* label (SW renders glyphs, html5 ignores in M1) */
     lv_obj_t *label = lv_label_create(scr);
-    lv_label_set_text(label, "lvgl-html5-canvas M1 — FILL_RECT over WS");
+    lv_label_set_text(label, "lvgl-html5-canvas M2 — FILL_RECT + BORDER over WS");
     lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -30);
 

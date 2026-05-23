@@ -98,11 +98,14 @@ LRU on both ends; capacity ~4 MB browser, ~256 KB board (configurable).
   `docs/troubleshooting.md`
 - **tag**: `v0.2.0-m1` ✅
 
-### M2 — text + lines + borders
-- BORDER / LINE / GLYPH / BLOB_UPLOAD
-- glyph cache (board side: open-addressing hash; browser: Map + LRU)
-- demo: text labels + button outlines
-- **tag**: `v0.3.0-m2`
+### M2 — text + lines + borders (in progress)
+- [x] BORDER (0x11): solid colour, full/partial sides, radius, alpha hint;
+      demo panels carry full + top/bottom + thick-rounded variants;
+      `test_encoder::border_payload` + e2e BORDER-presence assertion
+- [ ] LINE (0x12)
+- [ ] GLYPH (0x21) + BLOB_UPLOAD (0x40) — glyph cache (board hash,
+      browser Map+LRU); demo text labels
+- **tag**: `v0.3.0-m2` (deferred until LINE + GLYPH land)
 
 ### M3 — images + arcs + clipping
 - IMAGE / ARC / SET_CLIP / CLEAR_CLIP

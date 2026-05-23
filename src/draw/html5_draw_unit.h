@@ -3,8 +3,10 @@
  * LVGL 9 draw unit that encodes draw ops into the lvgl-html5-canvas
  * binary protocol and pushes them to connected viewers via ws_server.
  *
- * M1: handles LV_DRAW_TASK_TYPE_FILL (solid colour, no gradient). Begin/End
- * frame is driven from main.c via display REFR_START / REFR_READY events.
+ * M1: FILL_RECT (solid colour, no gradient).
+ * M2: + BORDER (solid colour, any side mask, with radius).
+ * Begin/End frame is driven from main.c via display REFR_START / REFR_READY
+ * events.
  */
 #ifndef LHC_HTML5_DRAW_UNIT_H
 #define LHC_HTML5_DRAW_UNIT_H
@@ -38,6 +40,8 @@ typedef struct {
     uint32_t tasks_taken;
     uint32_t frames_sent;
     uint32_t empty_frames_skipped;
+    uint32_t fills_encoded;
+    uint32_t borders_encoded;
 } lhc_html5_stats_t;
 void lhc_html5_draw_unit_get_stats(lhc_html5_stats_t *out);
 

@@ -55,6 +55,57 @@ function fillRoundedRect(c, x, y, w, h, r) {
   c.fill();
 }
 
+// LVGL border-side bitmap (see src/misc/lv_style.h):
+//   BOTTOM=0x01, TOP=0x02, LEFT=0x04, RIGHT=0x08, FULL=0x0F.
+const SIDE_BOTTOM = 0x01, SIDE_TOP = 0x02, SIDE_LEFT = 0x04, SIDE_RIGHT = 0x08;
+const SIDE_FULL   = 0x0F;
+
+function strokeBorder(c, x, y, w, h, width, radius, side) {
+  // LVGL inset-stroke convention: border draws inside the rect.
+  // Translate to canvas: shift by width/2 and shrink size by width.
+  const lw = Math.max(1, width);
+  c.lineWidth = lw;
+  c.lineCap = 'butt';
+  c.lineJoin = 'miter';
+
+  if (side === SIDE_FULL || side === 0) {
+    // Full border — single stroked rounded path.
+    const inset = lw / 2;
+    const ix = x + inset, iy = y + inset;
+    const iw = w - lw,    ih = h - lw;
+    if (iw <= 0 || ih <= 0) return;
+    const rr = Math.max(0, Math.min(radius - inset, Math.floor(iw / 2), Math.floor(ih / 2)));
+    c.beginPath();
+    if (rr <= 0) {
+      c.rect(ix, iy, iw, ih);
+    } else {
+      c.moveTo(ix + rr, iy);
+      c.lineTo(ix + iw - rr, iy);
+      c.quadraticCurveTo(ix + iw, iy, ix + iw, iy + rr);
+      c.lineTo(ix + iw, iy + ih - rr);
+      c.quadraticCurveTo(ix + iw, iy + ih, ix + iw - rr, iy + ih);
+      c.lineTo(ix + rr, iy + ih);
+      c.quadraticCurveTo(ix, iy + ih, ix, iy + ih - rr);
+      c.lineTo(ix, iy + rr);
+      c.quadraticCurveTo(ix, iy, ix + rr, iy);
+      c.closePath();
+    }
+    c.stroke();
+    return;
+  }
+
+  // Partial sides — draw selected edges as straight lines. Radius is
+  // ignored on partial sides (matches LVGL SW behaviour closely enough
+  // for M2; corner-rounded partial borders land with full ARC support).
+  const half = lw / 2;
+  c.beginPath();
+  if (side & SIDE_TOP)    { c.moveTo(x, y + half);         c.lineTo(x + w, y + half); }
+  if (side & SIDE_BOTTOM) { c.moveTo(x, y + h - half);     c.lineTo(x + w, y + h - half); }
+  if (side & SIDE_LEFT)   { c.moveTo(x + half, y);         c.lineTo(x + half, y + h); }
+  if (side & SIDE_RIGHT)  { c.moveTo(x + w - half, y);     c.lineTo(x + w - half, y + h); }
+  c.stroke();
+}
+
 function renderFrame(frame) {
   // Always clear; LVGL re-paints the full screen each refresh for M1.
   // (When dirty-rects land in M5 we'll switch to incremental.)
@@ -76,6 +127,12 @@ function renderFrame(frame) {
         const d = Decoders[cmd.opcode](cmd.payload);
         ctx.fillStyle = argbToCss(d.argb);
         fillRoundedRect(ctx, d.x, d.y, d.w, d.h, d.radius);
+        break;
+      }
+      case Proto.OP_BORDER: {
+        const d = Decoders[cmd.opcode](cmd.payload);
+        ctx.strokeStyle = argbToCss(d.argb);
+        strokeBorder(ctx, d.x, d.y, d.w, d.h, d.width, d.radius, d.side);
         break;
       }
       default:
@@ -157,4 +214,4 @@ function handleMessage(data) {
   }
 }
 
-log('viewer M1 ready');
+log('viewer M2 ready (FILL_RECT + BORDER)');

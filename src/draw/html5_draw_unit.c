@@ -22,6 +22,7 @@
 #include "src/draw/lv_draw_private.h"
 #include "src/draw/lv_draw_rect.h"
 #include "src/misc/lv_grad.h"
+#include "src/misc/lv_style.h"
 
 #include "../proto/encoder.h"
 #include "../transport/ws_server.h"
@@ -41,7 +42,7 @@ static uint16_t           g_frame_id = 0;
 static bool               g_frame_open = false;
 static bool               g_overflow_logged_this_frame = false;
 static lhc_html5_stats_t  g_stats;
-static uint32_t           g_fills_this_frame = 0;
+static uint32_t           g_ops_this_frame = 0;
 
 /* ---- helpers ---- */
 
@@ -54,10 +55,22 @@ static uint32_t color_to_argb(lv_color_t c, lv_opa_t opa)
 
 static bool fill_is_simple(const lv_draw_fill_dsc_t *d)
 {
-    /* M1 only handles solid colour, no gradient, full coverage tasks. */
+    /* Solid colour fills only — no gradients, no transparent ops. */
     if (!d) return false;
     if (d->grad.dir != LV_GRAD_DIR_NONE) return false;
     if (d->opa == 0) return false;
+    return true;
+}
+
+static bool border_is_simple(const lv_draw_border_dsc_t *d)
+{
+    /* M2: any solid-colour border with positive width is fine.
+     * Side bitmap is forwarded verbatim — viewer decides which edges
+     * to stroke. NONE / INTERNAL we skip (SW handles or it's a no-op). */
+    if (!d) return false;
+    if (d->opa == 0) return false;
+    if (d->width <= 0) return false;
+    if (d->side == LV_BORDER_SIDE_NONE) return false;
     return true;
 }
 
@@ -68,10 +81,15 @@ static int32_t lhc_evaluate_cb(lv_draw_unit_t *du, lv_draw_task_t *task)
     (void)du;
     g_stats.evaluate_calls++;
 
-    if (task->type != LV_DRAW_TASK_TYPE_FILL) return 0;
-
-    const lv_draw_fill_dsc_t *d = (const lv_draw_fill_dsc_t *)task->draw_dsc;
-    if (!fill_is_simple(d)) return 0;
+    if (task->type == LV_DRAW_TASK_TYPE_FILL) {
+        const lv_draw_fill_dsc_t *d = (const lv_draw_fill_dsc_t *)task->draw_dsc;
+        if (!fill_is_simple(d)) return 0;
+    } else if (task->type == LV_DRAW_TASK_TYPE_BORDER) {
+        const lv_draw_border_dsc_t *d = (const lv_draw_border_dsc_t *)task->draw_dsc;
+        if (!border_is_simple(d)) return 0;
+    } else {
+        return 0;
+    }
 
     /* Beat SW (score 100). 80 = 20% faster claim. */
     if (task->preference_score > 80) {
@@ -92,19 +110,34 @@ static int32_t lhc_dispatch_cb(lv_draw_unit_t *du, lv_layer_t *layer)
     /* take it */
     t->state = LV_DRAW_TASK_STATE_IN_PROGRESS;
 
-    if (t->type == LV_DRAW_TASK_TYPE_FILL && g_frame_open) {
-        const lv_draw_fill_dsc_t *d = (const lv_draw_fill_dsc_t *)t->draw_dsc;
+    if (g_frame_open) {
         int16_t x = (int16_t)t->area.x1;
         int16_t y = (int16_t)t->area.y1;
         int16_t w = (int16_t)(t->area.x2 - t->area.x1 + 1);
         int16_t h = (int16_t)(t->area.y2 - t->area.y1 + 1);
-        /* combined opacity: task->opa is the outer one. */
-        uint32_t opa = (uint32_t)d->opa * (uint32_t)t->opa / 255u;
-        uint32_t argb = color_to_argb(d->color, (lv_opa_t)opa);
-        uint8_t  radius = (d->radius < 0) ? 0 :
-                          (d->radius > 255 ? 255 : (uint8_t)d->radius);
-        lhc_enc_fill_rect(&g_enc, x, y, w, h, argb, radius);
-        g_fills_this_frame++;
+
+        if (t->type == LV_DRAW_TASK_TYPE_FILL) {
+            const lv_draw_fill_dsc_t *d = (const lv_draw_fill_dsc_t *)t->draw_dsc;
+            uint32_t opa = (uint32_t)d->opa * (uint32_t)t->opa / 255u;
+            uint32_t argb = color_to_argb(d->color, (lv_opa_t)opa);
+            uint8_t  radius = (d->radius < 0) ? 0 :
+                              (d->radius > 255 ? 255 : (uint8_t)d->radius);
+            lhc_enc_fill_rect(&g_enc, x, y, w, h, argb, radius);
+            g_ops_this_frame++;
+            g_stats.fills_encoded++;
+        } else if (t->type == LV_DRAW_TASK_TYPE_BORDER) {
+            const lv_draw_border_dsc_t *d = (const lv_draw_border_dsc_t *)t->draw_dsc;
+            uint32_t opa = (uint32_t)d->opa * (uint32_t)t->opa / 255u;
+            uint32_t argb = color_to_argb(d->color, (lv_opa_t)opa);
+            int32_t bw = d->width; if (bw < 1) bw = 1; if (bw > 255) bw = 255;
+            uint8_t  radius = (d->radius < 0) ? 0 :
+                              (d->radius > 255 ? 255 : (uint8_t)d->radius);
+            uint8_t  side   = (uint8_t)(d->side & 0xFF);
+            lhc_enc_border(&g_enc, x, y, w, h, argb, (uint8_t)bw, radius, side);
+            g_ops_this_frame++;
+            g_stats.borders_encoded++;
+        }
+
         if (g_enc.overflow && !g_overflow_logged_this_frame) {
             g_overflow_logged_this_frame = true;
             fprintf(stderr, "lhc: frame buffer overflow — dropping ops\n");
@@ -153,7 +186,7 @@ void lhc_html5_draw_unit_begin_frame(int16_t w, int16_t h)
     lhc_enc_begin_frame(&g_enc, g_frame_id, w, h);
     g_frame_open = true;
     g_overflow_logged_this_frame = false;
-    g_fills_this_frame = 0;
+    g_ops_this_frame = 0;
 }
 
 size_t lhc_html5_draw_unit_flush_frame(void)
@@ -162,9 +195,9 @@ size_t lhc_html5_draw_unit_flush_frame(void)
     g_frame_open = false;
     /* Skip empty frames — LVGL's internal refresh timer fires a cycle every
      * ~30ms even when nothing is dirty. Broadcasting BEGIN+END with zero
-     * FILL_RECTs would clear the viewer's canvas to black between real
+     * draw ops would clear the viewer's canvas to black between real
      * frames, causing visible flicker. Drop them silently. */
-    if (g_fills_this_frame == 0) {
+    if (g_ops_this_frame == 0) {
         g_stats.empty_frames_skipped++;
         return 0;
     }

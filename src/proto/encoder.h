@@ -44,9 +44,11 @@ void lhc_enc_end_frame(lhc_enc_t *e);
 /* Returns total bytes written, or 0 on overflow. */
 size_t lhc_enc_finalize(lhc_enc_t *e);
 
-/* Drawing ops (M1: FILL_RECT; later milestones add more). */
+/* Drawing ops. */
 void lhc_enc_fill_rect(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
                        uint32_t argb, uint8_t radius);
+void lhc_enc_border(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
+                    uint32_t argb, uint8_t width, uint8_t radius, uint8_t side);
 
 /* Low-level escape hatch (also used by tests). */
 bool lhc_enc_cmd(lhc_enc_t *e, uint8_t opcode, uint8_t flags,

@@ -12,7 +12,7 @@ export const Proto = Object.freeze({
   OP_END_FRAME: 0x02,
   /** i16 x,y,w,h; u32 argb; u8 radius (13) */
   OP_FILL_RECT: 0x10,
-  /** i16 x,y,w,h; u32 argb; u8 w; u8 r (14) */
+  /** i16 x,y,w,h; u32 argb; u8 w; u8 r; u8 side (15) */
   OP_BORDER: 0x11,
   /** i16 x1,y1,x2,y2; u32 argb; u8 w  (13) */
   OP_LINE: 0x12,

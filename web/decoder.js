@@ -43,4 +43,12 @@ export const Decoders = {
     argb: p.getUint32(8, true) >>> 0,
     radius: p.getUint8(12),
   }),
+  [Proto.OP_BORDER]:      (p) => ({
+    x: p.getInt16(0, true),  y: p.getInt16(2, true),
+    w: p.getInt16(4, true),  h: p.getInt16(6, true),
+    argb: p.getUint32(8, true) >>> 0,
+    width:  p.getUint8(12),
+    radius: p.getUint8(13),
+    side:   p.getUint8(14),
+  }),
 };

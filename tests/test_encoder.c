@@ -139,6 +139,34 @@ static int test_reinit_resets_state(void)
     return 0;
 }
 
+static int test_border_payload(void)
+{
+    uint8_t buf[1024];
+    lhc_enc_t e;
+    lhc_enc_init(&e, buf, sizeof(buf));
+    lhc_enc_begin_frame(&e, 0, 100, 100);
+    /* border: rect 5,6 70x80, argb opaque red, w=3, r=4, side=FULL(0x0F) */
+    lhc_enc_border(&e, 5, 6, 70, 80, 0xFFFF0000u, 3, 4, 0x0F);
+    lhc_enc_end_frame(&e);
+    size_t n = lhc_enc_finalize(&e);
+    CHECK(n > 0, "no overflow");
+    CHECK(e.cmd_count == 3, "3 cmds");
+    const uint8_t *p = buf + 12;
+    CHECK(p[0] == LHC_OP_BORDER, "BORDER opcode");
+    CHECK(p[1] == 0, "no alpha hint (FF)");
+    CHECK(p[2] == 15 && p[3] == 0, "payload_len=15");
+    CHECK(p[4] == 5 && p[5] == 0, "x LE");
+    CHECK(p[6] == 6 && p[7] == 0, "y LE");
+    CHECK(p[8] == 70 && p[9] == 0, "w LE");
+    CHECK(p[10] == 80 && p[11] == 0, "h LE");
+    /* argb 0xFFFF0000 LE → 00 00 FF FF */
+    CHECK(p[12] == 0x00 && p[13] == 0x00 && p[14] == 0xFF && p[15] == 0xFF, "argb LE");
+    CHECK(p[16] == 3, "border width");
+    CHECK(p[17] == 4, "radius");
+    CHECK(p[18] == 0x0F, "side bitmap");
+    return 0;
+}
+
 int main(void)
 {
     struct { const char *name; int (*fn)(void); } tests[] = {
@@ -148,6 +176,7 @@ int main(void)
         { "overflow_safe",       test_overflow_safe },
         { "multiple_fills",      test_multiple_fills },
         { "reinit_resets_state", test_reinit_resets_state },
+        { "border_payload",      test_border_payload },
     };
     int failures = 0;
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {

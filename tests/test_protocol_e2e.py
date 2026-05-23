@@ -26,7 +26,7 @@ except ImportError:
     sys.exit(0)
 
 URI = "ws://127.0.0.1:9000/"
-OP_BEGIN, OP_END, OP_FILL = 0x01, 0x02, 0x10
+OP_BEGIN, OP_END, OP_FILL, OP_BORDER = 0x01, 0x02, 0x10, 0x11
 N_FRAMES = 20  # enough to catch a 50% drop pattern many times over
 
 EXPECTED_COLORS = {  # (r, g, b) — see main.c demo scene
@@ -87,6 +87,9 @@ def main():
     failures = []
     prev_fid = -1
     seen_colors = set()
+    saw_border = False
+    border_sides_seen = set()
+    border_payload_lens = set()
 
     for i, msg in enumerate(frames):
         try:
@@ -124,9 +127,21 @@ def main():
             b, g, r, a = struct.unpack_from("<BBBB", payload, 8)
             seen_colors.add((r, g, b))
 
+        for op, _, payload in ops:
+            if op != OP_BORDER:
+                continue
+            saw_border = True
+            border_payload_lens.add(len(payload))
+            if len(payload) >= 15:
+                border_sides_seen.add(payload[14])
+
     missing = EXPECTED_COLORS - seen_colors
     if missing:
         failures.append(f"missing demo colors: {sorted(missing)}")
+    if not saw_border:
+        failures.append("no BORDER op observed — M2 demo borders missing")
+    if border_payload_lens and border_payload_lens != {15}:
+        failures.append(f"BORDER payload size unexpected: {border_payload_lens} (want {{15}})")
 
     if failures:
         print(f"FAIL ({len(failures)} issues over {len(frames)} frames):")
@@ -136,7 +151,8 @@ def main():
 
     print(
         f"PASS protocol_e2e: {len(frames)} frames, "
-        f"all non-empty, fids monotonic, {len(seen_colors)} unique colors"
+        f"all non-empty, fids monotonic, {len(seen_colors)} unique colors, "
+        f"borders={saw_border} sides_seen={sorted(border_sides_seen)}"
     )
     return 0
 

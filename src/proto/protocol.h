@@ -32,7 +32,7 @@
 
 /* @op category: 2D primitives */
 #define LHC_OP_FILL_RECT        0x10    /* i16 x,y,w,h; u32 argb; u8 radius (13) */
-#define LHC_OP_BORDER           0x11    /* i16 x,y,w,h; u32 argb; u8 w; u8 r (14) */
+#define LHC_OP_BORDER           0x11    /* i16 x,y,w,h; u32 argb; u8 w; u8 r; u8 side (15) */
 #define LHC_OP_LINE             0x12    /* i16 x1,y1,x2,y2; u32 argb; u8 w  (13) */
 
 /* @op category: glyph / image */
