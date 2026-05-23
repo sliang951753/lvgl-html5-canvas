@@ -40,7 +40,7 @@
    LOG
  *====================*/
 #define LV_USE_LOG              1
-#define LV_LOG_LEVEL            LV_LOG_LEVEL_INFO
+#define LV_LOG_LEVEL            LV_LOG_LEVEL_WARN
 #define LV_LOG_PRINTF           1
 
 /*====================
@@ -52,7 +52,10 @@
 
 #define LV_FONT_MONTSERRAT_14   1
 #define LV_FONT_MONTSERRAT_16   1
+#define LV_FONT_MONTSERRAT_20   1
 #define LV_FONT_MONTSERRAT_24   1
+#define LV_FONT_MONTSERRAT_26   1
+#define LV_FONT_MONTSERRAT_28   1
 #define LV_FONT_DEFAULT         &lv_font_montserrat_16
 
 /*====================

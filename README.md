@@ -31,13 +31,18 @@ See [`docs/architecture.md`](docs/architecture.md) and
 
 ## Status
 
-🚧 **M0 — scaffold**. Empty draw unit registers and logs each op. WS
-server stub. Build runs on Linux-host. No real drawing yet.
+✅ **M1 — real frame streaming**. The `html5_draw_unit` claims solid
+`FILL_RECT` tasks, encodes them into the [binary protocol](docs/protocol.md),
+and broadcasts each frame to all connected viewers at 30 Hz. Empty
+refresh cycles are dropped to avoid viewer-side flicker. WebSocket I/O
+runs on its own pthread so the LVGL main loop stays unblocked. See
+[`docs/architecture.md`](docs/architecture.md) for thread model and the
+draw-unit lifecycle.
 
 | Milestone | Scope | Tag |
 |-----------|-------|-----|
 | **M0** | scaffold, build, WS stub, empty draw unit | `v0.1.0-m0` |
-| M1 | FILL_RECT + browser viewer + end-to-end frame | `v0.2.0-m1` |
+| **M1** | FILL_RECT + browser viewer + end-to-end frame | `v0.2.0-m1` |
 | M2 | BORDER/LINE/GLYPH + bitmap LRU | `v0.3.0-m2` |
 | M3 | IMAGE/ARC/CLIP, SW fallback for the rest | `v0.4.0-m3` |
 | M4 | Input round-trip (pointer/key → lv_indev) | `v0.5.0-m4` |
@@ -48,9 +53,30 @@ server stub. Build runs on Linux-host. No real drawing yet.
 ```bash
 cmake --preset linux-host
 cmake --build --preset linux-host
-./build/linux-host/lvgl_html5_canvas
-# then in a browser: open web/index.html, point it at ws://localhost:9000
+
+# 1) start the LVGL app — opens WS on :9000
+./build/linux-host/lvgl_html5_canvas &
+
+# 2) serve the viewer page
+python3 -m http.server 8000 --directory web &
+# then open http://<host>:8000/ in a browser — it auto-connects to ws://<host>:9000
 ```
+
+## Tests
+
+```bash
+ctest --test-dir build/linux-host --output-on-failure
+```
+
+Three tests run:
+
+- `test_encoder` — byte-level encoder unit tests (6 cases)
+- `protocol_js_up_to_date` — verifies `web/protocol.js` is regenerated
+  from `src/proto/protocol.h`
+- `protocol_e2e` — spawns the binary, connects as a viewer, samples 20
+  frames, and asserts (a) no empty frames leak through, (b) frame IDs
+  are monotonic, (c) all 5 demo colours are present. Regression pin
+  for the v0.1→v0.2 empty-frame-flicker bug.
 
 Dependencies (LVGL 9.5, libwebsockets) are pulled via CMake `FetchContent`
 on first configure. No git submodules.

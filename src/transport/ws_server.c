@@ -1,16 +1,17 @@
 /**
  * @file ws_server.c
- * Minimal libwebsockets server.
- *
- * M0 scope:
- *  - Accept any path, sub-protocol "lhc-v0".
- *  - Track connected viewers, log connect/disconnect.
- *  - Send a 4-byte heartbeat every ~1s so the browser can verify the link.
+ * libwebsockets server, runs on its own thread.
  *
  * M1 scope:
- *  - lhc_ws_server_broadcast() queues a frame on every viewer; lws callback
- *    pulls from a per-viewer ring on LWS_CALLBACK_SERVER_WRITEABLE.
- *  - For now broadcast() is a no-op placeholder.
+ *  - subprotocol "lhc-v0", binary only.
+ *  - lhc_ws_server_broadcast() pushes a frame to every viewer's ring;
+ *    LWS_CALLBACK_SERVER_WRITEABLE drains the ring with lws_write().
+ *  - One drop-oldest ring per viewer (16 slots).
+ *  - Service loop runs on a dedicated pthread so lvgl rendering on the
+ *    main thread doesn't block on libwebsockets poll() (which can sit on
+ *    epoll_wait for ~1s waiting for its own scheduled timers, even with
+ *    timeout_ms=0). Broadcast wakes the service thread with
+ *    lws_cancel_service().
  */
 #include "ws_server.h"
 
@@ -18,60 +19,128 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 
 #include <libwebsockets.h>
 
-#define LHC_MAX_VIEWERS 8
+#define LHC_RING_CAPACITY 16
+
+typedef struct {
+    uint8_t *data;
+    size_t   len;
+} lhc_msg_t;
+
+struct per_session_data {
+    lhc_msg_t ring[LHC_RING_CAPACITY];
+    int       head;
+    int       tail;
+    int       count;
+    int       dropped;
+};
 
 struct lhc_ws_server {
     struct lws_context *ctx;
     int viewer_count;
-    uint64_t last_heartbeat_ms;
+    pthread_t thread;
+    volatile int running;
 };
 
-static uint64_t now_ms(void)
+static lhc_ws_server_t *g_srv = NULL;
+static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
+
+#define LHC_MAX_VIEWERS 8
+static struct per_session_data *g_sessions[LHC_MAX_VIEWERS];
+static struct lws              *g_wsi[LHC_MAX_VIEWERS];
+static int                      g_session_count = 0;
+
+static void session_add(struct lws *wsi, struct per_session_data *pss)
 {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000u + (uint64_t)ts.tv_nsec / 1000000u;
+    if (g_session_count >= LHC_MAX_VIEWERS) return;
+    g_sessions[g_session_count] = pss;
+    g_wsi[g_session_count] = wsi;
+    g_session_count++;
+}
+static void session_remove(struct lws *wsi)
+{
+    for (int i = 0; i < g_session_count; i++) {
+        if (g_wsi[i] == wsi) {
+            struct per_session_data *pss = g_sessions[i];
+            while (pss->count > 0) {
+                free(pss->ring[pss->tail].data);
+                pss->ring[pss->tail].data = NULL;
+                pss->tail = (pss->tail + 1) % LHC_RING_CAPACITY;
+                pss->count--;
+            }
+            g_sessions[i] = g_sessions[g_session_count - 1];
+            g_wsi[i]      = g_wsi[g_session_count - 1];
+            g_session_count--;
+            return;
+        }
+    }
 }
 
-struct per_session_data {
-    int dummy;
-};
-
-static lhc_ws_server_t *g_srv = NULL; /* lws callbacks need to find the server */
+static void ring_push(struct per_session_data *pss, const uint8_t *data, size_t len)
+{
+    if (pss->count == LHC_RING_CAPACITY) {
+        free(pss->ring[pss->tail].data);
+        pss->ring[pss->tail].data = NULL;
+        pss->tail = (pss->tail + 1) % LHC_RING_CAPACITY;
+        pss->count--;
+        pss->dropped++;
+    }
+    uint8_t *copy = malloc(LWS_PRE + len);
+    if (!copy) return;
+    memcpy(copy + LWS_PRE, data, len);
+    pss->ring[pss->head].data = copy;
+    pss->ring[pss->head].len  = len;
+    pss->head = (pss->head + 1) % LHC_RING_CAPACITY;
+    pss->count++;
+}
 
 static int callback_lhc(struct lws *wsi, enum lws_callback_reasons reason,
                         void *user, void *in, size_t len)
 {
-    (void)user; (void)in; (void)len;
+    struct per_session_data *pss = (struct per_session_data *)user;
+    (void)in;
     switch (reason) {
     case LWS_CALLBACK_ESTABLISHED:
+        pthread_mutex_lock(&g_lock);
+        memset(pss, 0, sizeof(*pss));
+        session_add(wsi, pss);
         if (g_srv) g_srv->viewer_count++;
+        pthread_mutex_unlock(&g_lock);
         lwsl_user("lhc: viewer connected (total=%d)\n",
                   g_srv ? g_srv->viewer_count : -1);
         break;
     case LWS_CALLBACK_CLOSED:
+        pthread_mutex_lock(&g_lock);
+        session_remove(wsi);
         if (g_srv && g_srv->viewer_count > 0) g_srv->viewer_count--;
+        pthread_mutex_unlock(&g_lock);
         lwsl_user("lhc: viewer disconnected (total=%d)\n",
                   g_srv ? g_srv->viewer_count : -1);
         break;
     case LWS_CALLBACK_SERVER_WRITEABLE: {
-        /* M0: send a tiny heartbeat (4 bytes: 'L','H','C',0). */
-        unsigned char buf[LWS_PRE + 4];
-        unsigned char *p = &buf[LWS_PRE];
-        p[0] = 'L'; p[1] = 'H'; p[2] = 'C'; p[3] = 0;
-        int n = lws_write(wsi, p, 4, LWS_WRITE_BINARY);
-        if (n < 4) {
-            lwsl_warn("lhc: short write %d\n", n);
+        pthread_mutex_lock(&g_lock);
+        if (pss->count == 0) { pthread_mutex_unlock(&g_lock); break; }
+        lhc_msg_t m = pss->ring[pss->tail];
+        pss->ring[pss->tail].data = NULL;
+        pss->tail = (pss->tail + 1) % LHC_RING_CAPACITY;
+        pss->count--;
+        int still_more = pss->count > 0;
+        pthread_mutex_unlock(&g_lock);
+
+        int n = lws_write(wsi, m.data + LWS_PRE, m.len, LWS_WRITE_BINARY);
+        free(m.data);
+        if (n < (int)m.len) {
+            lwsl_warn("lhc: short write %d/%zu\n", n, m.len);
             return -1;
         }
+        if (still_more) lws_callback_on_writable(wsi);
         break;
     }
     case LWS_CALLBACK_RECEIVE:
-        /* M4: forward upstream bytes to input ring. M0: just log. */
-        lwsl_user("lhc: rx %zu bytes (ignored in M0)\n", len);
+        lwsl_user("lhc: rx %zu bytes (ignored in M1)\n", len);
         break;
     default:
         break;
@@ -83,6 +152,15 @@ static const struct lws_protocols protocols[] = {
     { "lhc-v0", callback_lhc, sizeof(struct per_session_data), 4096, 0, NULL, 0 },
     LWS_PROTOCOL_LIST_TERM
 };
+
+static void *ws_thread_main(void *arg)
+{
+    lhc_ws_server_t *srv = (lhc_ws_server_t *)arg;
+    while (srv->running) {
+        lws_service(srv->ctx, 50);
+    }
+    return NULL;
+}
 
 lhc_ws_server_t *lhc_ws_server_start(int port)
 {
@@ -106,34 +184,45 @@ lhc_ws_server_t *lhc_ws_server_start(int port)
         return NULL;
     }
     g_srv = srv;
-    srv->last_heartbeat_ms = now_ms();
-    fprintf(stderr, "lhc: WS server listening on :%d (subprotocol=lhc-v0)\n", port);
+    srv->running = 1;
+    if (pthread_create(&srv->thread, NULL, ws_thread_main, srv) != 0) {
+        fprintf(stderr, "lhc: pthread_create failed\n");
+        lws_context_destroy(srv->ctx);
+        free(srv);
+        g_srv = NULL;
+        return NULL;
+    }
+    fprintf(stderr, "lhc: WS server listening on :%d (subprotocol=lhc-v0, dedicated thread)\n", port);
     return srv;
 }
 
 void lhc_ws_server_service(lhc_ws_server_t *srv, int timeout_ms)
 {
-    if (!srv) return;
-    lws_service(srv->ctx, timeout_ms);
-
-    /* M0 heartbeat: every 1s, request callback_on_writable for everyone. */
-    uint64_t now = now_ms();
-    if (now - srv->last_heartbeat_ms >= 1000 && srv->viewer_count > 0) {
-        srv->last_heartbeat_ms = now;
-        lws_callback_on_writable_all_protocol(srv->ctx, &protocols[0]);
-    }
+    (void)srv; (void)timeout_ms;
+    /* No-op: service runs on a dedicated thread. */
 }
 
 void lhc_ws_server_broadcast(lhc_ws_server_t *srv, const uint8_t *data, size_t len)
 {
-    /* M1: queue per-viewer ring and request writable. M0 placeholder. */
-    (void)srv; (void)data; (void)len;
+    if (!srv || !data || len == 0) return;
+    pthread_mutex_lock(&g_lock);
+    if (g_session_count == 0) { pthread_mutex_unlock(&g_lock); return; }
+    for (int i = 0; i < g_session_count; i++) {
+        ring_push(g_sessions[i], data, len);
+        lws_callback_on_writable(g_wsi[i]);
+    }
+    pthread_mutex_unlock(&g_lock);
+    lws_cancel_service(srv->ctx);
 }
 
 void lhc_ws_server_stop(lhc_ws_server_t *srv)
 {
     if (!srv) return;
+    srv->running = 0;
+    lws_cancel_service(srv->ctx);
+    pthread_join(srv->thread, NULL);
     lws_context_destroy(srv->ctx);
     if (g_srv == srv) g_srv = NULL;
+    g_session_count = 0;
     free(srv);
 }

@@ -1,14 +1,20 @@
 // viewer.js — top-level glue between WS, decoder, and the canvas.
-// M0: connects, logs incoming bytes (4-byte heartbeat). No drawing yet.
+// M1: replay BEGIN_FRAME / END_FRAME / FILL_RECT onto a 2D canvas.
 
 import { connect } from './ws.js';
-import { decodeFrame } from './decoder.js';
+import { decodeFrame, Decoders } from './decoder.js';
+import { Proto } from './protocol.js';
 
 const $ = (sel) => document.querySelector(sel);
 const logEl = $('#log');
 const statusEl = $('#status');
 const canvas = $('#canvas');
 const ctx = canvas.getContext('2d');
+
+let frameCount = 0;
+let lastFps = 0;
+let fpsT0 = performance.now();
+let fpsFrames = 0;
 
 function log(msg) {
   const t = new Date().toISOString().substr(11, 12);
@@ -24,6 +30,65 @@ function setStatus(s, color) {
   statusEl.style.color = color || '#6f6';
 }
 
+function argbToCss(argb) {
+  const a = ((argb >>> 24) & 0xFF) / 255;
+  const r = (argb >>> 16) & 0xFF;
+  const g = (argb >>> 8) & 0xFF;
+  const b = argb & 0xFF;
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function fillRoundedRect(c, x, y, w, h, r) {
+  if (r <= 0) { c.fillRect(x, y, w, h); return; }
+  const rr = Math.min(r, Math.floor(w / 2), Math.floor(h / 2));
+  c.beginPath();
+  c.moveTo(x + rr, y);
+  c.lineTo(x + w - rr, y);
+  c.quadraticCurveTo(x + w, y, x + w, y + rr);
+  c.lineTo(x + w, y + h - rr);
+  c.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  c.lineTo(x + rr, y + h);
+  c.quadraticCurveTo(x, y + h, x, y + h - rr);
+  c.lineTo(x, y + rr);
+  c.quadraticCurveTo(x, y, x + rr, y);
+  c.closePath();
+  c.fill();
+}
+
+function renderFrame(frame) {
+  // Always clear; LVGL re-paints the full screen each refresh for M1.
+  // (When dirty-rects land in M5 we'll switch to incremental.)
+  let cleared = false;
+  for (const cmd of frame.cmds) {
+    switch (cmd.opcode) {
+      case Proto.OP_BEGIN_FRAME: {
+        const d = Decoders[cmd.opcode](cmd.payload);
+        if (canvas.width !== d.w || canvas.height !== d.h) {
+          canvas.width = d.w; canvas.height = d.h;
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        cleared = true;
+        break;
+      }
+      case Proto.OP_END_FRAME:
+        break;
+      case Proto.OP_FILL_RECT: {
+        const d = Decoders[cmd.opcode](cmd.payload);
+        ctx.fillStyle = argbToCss(d.argb);
+        fillRoundedRect(ctx, d.x, d.y, d.w, d.h, d.radius);
+        break;
+      }
+      default:
+        // unknown opcode — silently skip (forward compat)
+        break;
+    }
+  }
+  if (!cleared) {
+    // safety: if BEGIN_FRAME missing, still clear
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
 let ws = null;
 $('#connect').addEventListener('click', () => {
   if (ws) { ws.close(); ws = null; }
@@ -33,27 +98,31 @@ $('#connect').addEventListener('click', () => {
     onOpen:    () => { setStatus('connected', '#6f6'); log(`open ${url}`); },
     onClose:   () => { setStatus('disconnected', '#f66'); log('close'); },
     onError:   (e) => { setStatus('error', '#f66'); log(`error: ${e.message || e}`); },
-    onMessage: (data) => { handleMessage(data); },
+    onMessage: handleMessage,
   });
 });
 
 function handleMessage(data) {
-  // M0: heartbeat is 4 ASCII bytes "LHC\0". Detect and skip.
-  if (data.byteLength === 4) {
-    const v = new Uint8Array(data);
-    if (v[0] === 0x4C && v[1] === 0x48 && v[2] === 0x43 && v[3] === 0x00) {
-      log(`heartbeat (${data.byteLength}B)`);
-      return;
-    }
-  }
-  // M1+: full frame
+  let frame;
   try {
-    const frame = decodeFrame(data);
-    log(`frame #${frame.frameId} cmds=${frame.cmds.length}`);
-    // M1 will replay cmds onto ctx here.
+    frame = decodeFrame(data);
   } catch (e) {
     log(`decode err: ${e.message}`);
+    return;
+  }
+  renderFrame(frame);
+
+  frameCount++;
+  fpsFrames++;
+  const now = performance.now();
+  if (now - fpsT0 >= 1000) {
+    lastFps = (fpsFrames * 1000 / (now - fpsT0)).toFixed(1);
+    fpsT0 = now; fpsFrames = 0;
+    setStatus(`connected · ${lastFps} fps · frame #${frame.frameId}`, '#6f6');
+  }
+  if (frameCount <= 3) {
+    log(`frame #${frame.frameId} cmds=${frame.cmds.length} bytes=${data.byteLength}`);
   }
 }
 
-log('viewer M0 ready');
+log('viewer M1 ready');

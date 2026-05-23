@@ -19,9 +19,9 @@ set(FETCHCONTENT_QUIET OFF)
 
 # --- LVGL 9.5 ---
 set(LV_CONF_PATH "${CMAKE_SOURCE_DIR}/src/lv_conf.h" CACHE FILEPATH "" FORCE)
-set(LV_CONF_BUILD_DISABLE_EXAMPLES   ON CACHE BOOL "" FORCE)
-set(LV_CONF_BUILD_DISABLE_DEMOS      ON  CACHE BOOL "" FORCE)
-set(CONFIG_LV_BUILD_DEMOS            OFF CACHE BOOL "" FORCE)
+set(LV_CONF_BUILD_DISABLE_EXAMPLES   ON  CACHE BOOL "" FORCE)
+set(LV_CONF_BUILD_DISABLE_DEMOS      OFF CACHE BOOL "" FORCE)
+set(CONFIG_LV_BUILD_DEMOS            ON  CACHE BOOL "" FORCE)
 set(CONFIG_LV_BUILD_EXAMPLES         OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
@@ -138,6 +138,7 @@ if(LHC_BUILD_APP)
   target_link_libraries(lvgl_html5_canvas PRIVATE
     lhc_proto
     lvgl
+    lvgl_demos
     websockets
   )
   add_dependencies(lvgl_html5_canvas gen_protocol_js)
@@ -160,4 +161,15 @@ if(LHC_BUILD_TESTS)
     COMMAND ${Python3_EXECUTABLE} ${GEN_JS_SCRIPT}
             --header ${PROTOCOL_H} --out ${PROTOCOL_JS} --check
   )
+
+  if(LHC_BUILD_APP)
+    add_test(
+      NAME protocol_e2e
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_protocol_e2e.py
+    )
+    set_tests_properties(protocol_e2e PROPERTIES
+      ENVIRONMENT "LHC_BIN=$<TARGET_FILE:lvgl_html5_canvas>"
+      TIMEOUT 30
+    )
+  endif()
 endif()

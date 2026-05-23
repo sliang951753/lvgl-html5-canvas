@@ -100,6 +100,45 @@ static int test_overflow_safe(void)
     return 0;
 }
 
+static int test_multiple_fills(void)
+{
+    uint8_t buf[4096];
+    lhc_enc_t e;
+    lhc_enc_init(&e, buf, sizeof(buf));
+    lhc_enc_begin_frame(&e, 7, 800, 480);
+    for (int i = 0; i < 10; i++) {
+        lhc_enc_fill_rect(&e, (int16_t)(i * 10), 0, 8, 8, 0xFF112233u, 0);
+    }
+    lhc_enc_end_frame(&e);
+    size_t n = lhc_enc_finalize(&e);
+    CHECK(n > 0, "no overflow");
+    /* BEGIN + 10 FILL + END = 12 cmds */
+    CHECK(e.cmd_count == 12, "12 cmds total");
+    CHECK(buf[2] == 12 && buf[3] == 0, "cmd_count patched into header");
+    /* frame_id = 7 LE */
+    CHECK(buf[0] == 7 && buf[1] == 0, "frame_id");
+    return 0;
+}
+
+static int test_reinit_resets_state(void)
+{
+    uint8_t buf[256];
+    lhc_enc_t e;
+    lhc_enc_init(&e, buf, sizeof(buf));
+    lhc_enc_begin_frame(&e, 1, 10, 10);
+    lhc_enc_fill_rect(&e, 0, 0, 1, 1, 0xFF000000u, 0);
+    lhc_enc_end_frame(&e);
+    lhc_enc_finalize(&e);
+
+    /* re-init must zero pos/cmd_count/overflow/frame_open */
+    lhc_enc_init(&e, buf, sizeof(buf));
+    CHECK(e.pos == 0, "pos reset");
+    CHECK(e.cmd_count == 0, "cmd_count reset");
+    CHECK(e.overflow == false, "overflow reset");
+    CHECK(e.frame_open == false, "frame_open reset");
+    return 0;
+}
+
 int main(void)
 {
     struct { const char *name; int (*fn)(void); } tests[] = {
@@ -107,6 +146,8 @@ int main(void)
         { "fill_rect_payload",   test_fill_rect_payload },
         { "alpha_flag",          test_alpha_flag },
         { "overflow_safe",       test_overflow_safe },
+        { "multiple_fills",      test_multiple_fills },
+        { "reinit_resets_state", test_reinit_resets_state },
     };
     int failures = 0;
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
