@@ -370,9 +370,8 @@ int main(int argc, char **argv)
     lv_anim_set_exec_cb(&a5, (lv_anim_exec_xcb_t)lv_arc_set_value);
     lv_anim_start(&a5);
 
-    /* M3a LINE: horizontal + diagonal single-segment lines are now encoded
-     * by html5 draw unit; the polyline below intentionally remains SW fallback
-     * in this step. */
+    /* M3a/M3c LINE: horizontal + diagonal + polyline points[] are encoded
+     * by html5 draw unit (dash/round-cap variants remain SW fallback). */
     static lv_point_precise_t line_pts_a[] = { {40, 0}, {220, 0} };
     lv_obj_t *line_a = lv_line_create(scr);
     lv_line_set_points_mutable(line_a, line_pts_a, 2);

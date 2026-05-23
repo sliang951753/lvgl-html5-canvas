@@ -56,7 +56,7 @@ Decoders MUST skip unknown opcodes by advancing `4 + payload_len` bytes.
 
 ---
 
-## 2. Opcodes (v0 / M3a)
+## 2. Opcodes (v0 / M3b)
 
 | Opcode | Name          | Direction | Payload |
 |-------:|---------------|-----------|---------|
@@ -115,9 +115,9 @@ This was a real bug source during M1; the e2e test now pins it.
 | 8      | 4    | `argb`  | u32 LE bytes = `[B, G, R, A]` |
 | 12     | 1    | `width` | u8, line width in px |
 
-Current M3a server emits LINE only for simple single-segment line tasks
-(no polyline array, no dash, no round caps). Unsupported line styles
-fall back to LVGL SW draw unit.
+Current M3a/M3c server emits LINE for non-dashed butt-cap line tasks,
+including both direct `p1/p2` and polyline `points[]` segments.
+Dashed or rounded-cap variants still fall back to LVGL SW draw unit.
 
 ---
 

@@ -65,17 +65,17 @@ diagnostic lives. Our viewer logs both since v0.2.0-m1.
 **Symptom:** After M3a rollout, line widgets are visible but runtime stats
 show `lines=0`.
 
-**Cause:** Current LINE fast path only claims simple single-segment lines:
-- `points == NULL` and `point_cnt == 0`
-- no dash (`dash_width == 0`, `dash_gap == 0`)
-- no round caps (`round_start == round_end == 0`)
+**Cause:** Current LINE fast path claims non-dashed, butt-cap lines only:
+- `dash_width == 0` and `dash_gap == 0`
+- `round_start == 0` and `round_end == 0`
+- direct `p1/p2` and polyline `points[]` are both supported
 
-Polyline/dashed/rounded variants intentionally fall back to SW for now.
+Dashed/rounded-cap variants intentionally fall back to SW for now.
 
 **Fix:**
-1. Validate with a 2-point line object (single segment) first.
+1. Validate with either a 2-point line or a polyline widget (no dash/no round cap).
 2. Confirm `lines=` counter rises in `~/lhc.log`.
-3. Keep polyline/dashed lines in demo as explicit SW fallback coverage.
+3. Keep dashed/rounded line styles in demo as explicit SW fallback coverage.
 
 ### ARC capability appears missing / `arcs=0` in stats
 **Symptom:** After M3b rollout, arc widgets are visible via SW fallback but runtime stats

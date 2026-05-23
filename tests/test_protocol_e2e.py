@@ -177,13 +177,7 @@ def main():
     if border_payload_lens and border_payload_lens != {15}:
         failures.append(f"BORDER payload size unexpected: {border_payload_lens} (want {{15}})")
     if not saw_line:
-        if saw_shadow and saw_image and saw_border:
-            # Current M3a implementation is wired, but some LVGL task-shape paths
-            # still route lines through SW and can make OP_LINE absent in this short
-            # 20-frame capture window. Keep this as soft-observability signal for now.
-            print("INFO: no LINE op observed in this run; treating as non-fatal (M3a transitional)")
-        else:
-            failures.append("no LINE op observed — M3a line replay missing")
+        failures.append("no LINE op observed — M3a/M3c line replay missing")
     if line_payload_lens and line_payload_lens != {13}:
         failures.append(f"LINE payload size unexpected: {line_payload_lens} (want {{13}})")
     if not saw_arc:

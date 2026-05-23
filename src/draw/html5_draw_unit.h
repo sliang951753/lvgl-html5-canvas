@@ -6,7 +6,7 @@
  * M1: FILL_RECT (solid colour, no gradient).
  * M2: + BORDER (solid colour, any side mask, with radius).
  *     + BOX_SHADOW (solid color, radius/blur/spread/offset).
- * M3a: + LINE (single-segment, non-dashed, no round caps).
+ * M3a/M3c: + LINE (non-dashed, butt-cap; supports p1/p2 + polyline points[]).
  * M3b: + ARC (solid-color stroke arcs; no image-source arcs).
  * Begin/End frame is driven from main.c via display REFR_START / REFR_READY
  * events.

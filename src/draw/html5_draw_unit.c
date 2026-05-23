@@ -9,7 +9,8 @@
  *    REFR_READY display events, then the buffer is broadcast over WS.
  *
  * M3a extension: claim and encode simple LV_DRAW_TASK_TYPE_LINE tasks
- * (single segment only; no polyline/dash/round caps yet) as OP_LINE (0x12).
+ * (non-dashed, butt-cap; supports p1/p2 and polyline points[] segments)
+ * as OP_LINE (0x12).
  * M3b extension: claim and encode simple LV_DRAW_TASK_TYPE_ARC tasks
  * (solid-color stroke only, no image-source arcs) as OP_ARC (0x22).
  *
@@ -138,10 +139,12 @@ static bool line_is_simple(const lv_draw_line_dsc_t *d)
     if (d->opa == 0) return false;
     if (d->width <= 0) return false;
     if (d->dash_width != 0 || d->dash_gap != 0) return false;
+    /* Round caps need style bits we don't carry in OP_LINE yet. */
+    if (d->round_start || d->round_end) return false;
 
-    /* M3a: accept both direct (p1/p2) and polyline-backed line tasks.
-     * We'll encode a single segment from p1/p2; when LVGL stores points,
-     * SW may still iterate additional segments separately. */
+    /* M3c: support both direct (p1/p2) and polyline-backed (points[])
+     * non-dashed, butt-cap paths. */
+    if (d->points && d->point_cnt < 2) return false;
     return true;
 }
 
@@ -406,13 +409,30 @@ static int32_t lhc_dispatch_cb(lv_draw_unit_t *du, lv_layer_t *layer)
             uint32_t opa = (uint32_t)d->opa * (uint32_t)t->opa / 255u;
             uint32_t argb = color_to_argb(d->color, (lv_opa_t)opa);
             int32_t lw = d->width; if (lw < 1) lw = 1; if (lw > 255) lw = 255;
-            int16_t x1 = (int16_t)d->p1.x;
-            int16_t y1 = (int16_t)d->p1.y;
-            int16_t x2 = (int16_t)d->p2.x;
-            int16_t y2 = (int16_t)d->p2.y;
-            lhc_enc_line(&g_enc, x1, y1, x2, y2, argb, (uint8_t)lw);
-            g_ops_this_frame++;
-            g_stats.lines_encoded++;
+
+            if (d->points && d->point_cnt >= 2) {
+                for (int32_t i = 0; i < d->point_cnt - 1; i++) {
+                    const lv_point_precise_t p0 = d->points[i];
+                    const lv_point_precise_t p1 = d->points[i + 1];
+                    if (p0.x == LV_DRAW_LINE_POINT_NONE || p0.y == LV_DRAW_LINE_POINT_NONE) continue;
+                    if (p1.x == LV_DRAW_LINE_POINT_NONE || p1.y == LV_DRAW_LINE_POINT_NONE) continue;
+                    lhc_enc_line(&g_enc,
+                                 (int16_t)p0.x, (int16_t)p0.y,
+                                 (int16_t)p1.x, (int16_t)p1.y,
+                                 argb, (uint8_t)lw);
+                    g_ops_this_frame++;
+                    g_stats.lines_encoded++;
+                    if (g_enc.overflow) break;
+                }
+            } else {
+                int16_t x1 = (int16_t)d->p1.x;
+                int16_t y1 = (int16_t)d->p1.y;
+                int16_t x2 = (int16_t)d->p2.x;
+                int16_t y2 = (int16_t)d->p2.y;
+                lhc_enc_line(&g_enc, x1, y1, x2, y2, argb, (uint8_t)lw);
+                g_ops_this_frame++;
+                g_stats.lines_encoded++;
+            }
         } else if (t->type == LV_DRAW_TASK_TYPE_ARC) {
             const lv_draw_arc_dsc_t *d = (const lv_draw_arc_dsc_t *)t->draw_dsc;
             uint32_t opa = (uint32_t)d->opa * (uint32_t)t->opa / 255u;
