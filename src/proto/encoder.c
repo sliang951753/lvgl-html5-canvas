@@ -139,6 +139,25 @@ void lhc_enc_line(lhc_enc_t *e, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
     lhc_enc_cmd(e, LHC_OP_LINE, flags, p, sizeof(p));
 }
 
+void lhc_enc_arc(lhc_enc_t *e, int16_t cx, int16_t cy, uint16_t radius,
+                 int16_t start_angle, int16_t end_angle,
+                 uint32_t argb, uint8_t width)
+{
+    uint8_t p[15];
+    p[0] = (uint8_t)(cx & 0xFF);           p[1] = (uint8_t)((cx >> 8) & 0xFF);
+    p[2] = (uint8_t)(cy & 0xFF);           p[3] = (uint8_t)((cy >> 8) & 0xFF);
+    p[4] = (uint8_t)(radius & 0xFF);       p[5] = (uint8_t)((radius >> 8) & 0xFF);
+    p[6] = (uint8_t)(start_angle & 0xFF);  p[7] = (uint8_t)((start_angle >> 8) & 0xFF);
+    p[8] = (uint8_t)(end_angle & 0xFF);    p[9] = (uint8_t)((end_angle >> 8) & 0xFF);
+    p[10] = (uint8_t)(argb & 0xFF);
+    p[11] = (uint8_t)((argb >> 8) & 0xFF);
+    p[12] = (uint8_t)((argb >> 16) & 0xFF);
+    p[13] = (uint8_t)((argb >> 24) & 0xFF);
+    p[14] = width;
+    uint8_t flags = ((argb >> 24) != 0xFF) ? LHC_FLAG_HAS_ALPHA_HINT : 0;
+    lhc_enc_cmd(e, LHC_OP_ARC, flags, p, sizeof(p));
+}
+
 void lhc_enc_box_shadow(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
                         uint32_t argb, uint8_t radius, uint8_t blur,
                         int8_t spread, int16_t ofs_x, int16_t ofs_y, uint8_t bg_cover)

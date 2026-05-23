@@ -273,6 +273,103 @@ int main(int argc, char **argv)
     lv_anim_set_exec_cb(&a3, (lv_anim_exec_xcb_t)lv_obj_set_x);
     lv_anim_start(&a3);
 
+    /* M3a LINE case: a dedicated card with multiple line styles so LINE replay
+     * is obvious in demo view (single-segment lines are html5 path). */
+    lv_obj_t *line_case = lv_obj_create(scr);
+    lv_obj_remove_style_all(line_case);
+    lv_obj_set_size(line_case, 250, 130);
+    lv_obj_set_pos(line_case, 20, 320);
+    lv_obj_set_style_bg_color(line_case, lv_color_hex(0x162033), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(line_case, LV_OPA_80, LV_PART_MAIN);
+    lv_obj_set_style_radius(line_case, 10, LV_PART_MAIN);
+    lv_obj_set_style_border_color(line_case, lv_color_hex(0x5C6BC0), LV_PART_MAIN);
+    lv_obj_set_style_border_width(line_case, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(line_case, LV_OPA_70, LV_PART_MAIN);
+
+    lv_obj_t *line_case_title = lv_label_create(line_case);
+    lv_label_set_text(line_case_title, "LINE case");
+    lv_obj_set_style_text_color(line_case_title, lv_color_hex(0xE3F2FD), 0);
+    lv_obj_align(line_case_title, LV_ALIGN_TOP_LEFT, 8, 4);
+
+    static lv_point_precise_t line_case_h[] = { {10, 28}, {230, 28} };
+    lv_obj_t *line_h = lv_line_create(line_case);
+    lv_line_set_points_mutable(line_h, line_case_h, 2);
+    lv_obj_set_size(line_h, 240, 40);
+    lv_obj_set_pos(line_h, 4, 12);
+    lv_obj_set_style_line_width(line_h, 3, LV_PART_MAIN);
+    lv_obj_set_style_line_color(line_h, lv_color_hex(0x26C6DA), LV_PART_MAIN);
+    lv_obj_set_style_line_opa(line_h, LV_OPA_COVER, LV_PART_MAIN);
+
+    static lv_point_precise_t line_case_v[] = { {24, 0}, {24, 84} };
+    lv_obj_t *line_v = lv_line_create(line_case);
+    lv_line_set_points_mutable(line_v, line_case_v, 2);
+    lv_obj_set_size(line_v, 60, 90);
+    lv_obj_set_pos(line_v, 150, 30);
+    lv_obj_set_style_line_width(line_v, 4, LV_PART_MAIN);
+    lv_obj_set_style_line_color(line_v, lv_color_hex(0xEF5350), LV_PART_MAIN);
+    lv_obj_set_style_line_opa(line_v, LV_OPA_COVER, LV_PART_MAIN);
+
+    static lv_point_precise_t line_case_d[] = { {0, 0}, {180, 72} };
+    lv_obj_t *line_d = lv_line_create(line_case);
+    lv_line_set_points_mutable(line_d, line_case_d, 2);
+    lv_obj_set_size(line_d, 190, 80);
+    lv_obj_set_pos(line_d, 50, 40);
+    lv_obj_set_style_line_width(line_d, 5, LV_PART_MAIN);
+    lv_obj_set_style_line_color(line_d, lv_color_hex(0xFFCA28), LV_PART_MAIN);
+    lv_obj_set_style_line_opa(line_d, LV_OPA_90, LV_PART_MAIN);
+
+    /* M3b ARC case: dedicated arc widget card to visualize OP_ARC replay. */
+    lv_obj_t *arc_case = lv_obj_create(scr);
+    lv_obj_remove_style_all(arc_case);
+    lv_obj_set_size(arc_case, 260, 140);
+    lv_obj_set_pos(arc_case, 280, 315);
+    lv_obj_set_style_bg_color(arc_case, lv_color_hex(0x1B2238), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(arc_case, LV_OPA_80, LV_PART_MAIN);
+    lv_obj_set_style_radius(arc_case, 10, LV_PART_MAIN);
+    lv_obj_set_style_border_color(arc_case, lv_color_hex(0x7E57C2), LV_PART_MAIN);
+    lv_obj_set_style_border_width(arc_case, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(arc_case, LV_OPA_70, LV_PART_MAIN);
+
+    lv_obj_t *arc_title = lv_label_create(arc_case);
+    lv_label_set_text(arc_title, "ARC case");
+    lv_obj_set_style_text_color(arc_title, lv_color_hex(0xEDE7F6), 0);
+    lv_obj_align(arc_title, LV_ALIGN_TOP_LEFT, 8, 4);
+
+    lv_obj_t *arc_obj = lv_arc_create(arc_case);
+    lv_obj_set_size(arc_obj, 96, 96);
+    lv_obj_align(arc_obj, LV_ALIGN_LEFT_MID, 16, 8);
+    lv_arc_set_bg_angles(arc_obj, 30, 330);
+    lv_arc_set_range(arc_obj, 0, 100);
+    lv_arc_set_value(arc_obj, 20);
+    lv_obj_set_style_arc_width(arc_obj, 8, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(arc_obj, lv_color_hex(0x3949AB), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(arc_obj, 10, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(arc_obj, lv_color_hex(0xFF7043), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_opa(arc_obj, LV_OPA_90, LV_PART_INDICATOR);
+    lv_obj_remove_style(arc_obj, NULL, LV_PART_KNOB);
+
+    lv_obj_t *arc_obj2 = lv_arc_create(arc_case);
+    lv_obj_set_size(arc_obj2, 72, 72);
+    lv_obj_align(arc_obj2, LV_ALIGN_RIGHT_MID, -18, 8);
+    lv_arc_set_bg_angles(arc_obj2, 200, 20);
+    lv_arc_set_range(arc_obj2, 0, 100);
+    lv_arc_set_value(arc_obj2, 65);
+    lv_obj_set_style_arc_width(arc_obj2, 6, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(arc_obj2, lv_color_hex(0x455A64), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(arc_obj2, 7, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(arc_obj2, lv_color_hex(0x26C6DA), LV_PART_INDICATOR);
+    lv_obj_remove_style(arc_obj2, NULL, LV_PART_KNOB);
+
+    lv_anim_t a5;
+    lv_anim_init(&a5);
+    lv_anim_set_var(&a5, arc_obj);
+    lv_anim_set_values(&a5, 8, 92);
+    lv_anim_set_duration(&a5, 1800);
+    lv_anim_set_reverse_duration(&a5, 1800);
+    lv_anim_set_repeat_count(&a5, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&a5, (lv_anim_exec_xcb_t)lv_arc_set_value);
+    lv_anim_start(&a5);
+
     /* M3a LINE: horizontal + diagonal single-segment lines are now encoded
      * by html5 draw unit; the polyline below intentionally remains SW fallback
      * in this step. */
@@ -341,7 +438,7 @@ int main(int argc, char **argv)
 
     /* label (SW renders glyphs, html5 ignores in M1) */
     lv_obj_t *label = lv_label_create(scr);
-    lv_label_set_text(label, "lvgl-html5-canvas M3a — +LINE over WS (label still SW)");
+    lv_label_set_text(label, "lvgl-html5-canvas M3b — +ARC over WS (label still SW)");
     lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -30);
 
@@ -372,9 +469,9 @@ run_loop:
             lhc_html5_stats_t s;
             lhc_html5_draw_unit_get_stats(&s);
             fprintf(stderr,
-                    "lhc: stats eval=%u disp=%u taken=%u frames=%u fills=%u borders=%u lines=%u shadows=%u images=%u layers=%u blobs=%u blobKB=%u\n",
+                    "lhc: stats eval=%u disp=%u taken=%u frames=%u fills=%u borders=%u lines=%u arcs=%u shadows=%u images=%u layers=%u blobs=%u blobKB=%u\n",
                     s.evaluate_calls, s.dispatch_calls, s.tasks_taken, s.frames_sent,
-                    s.fills_encoded, s.borders_encoded, s.lines_encoded, s.shadows_encoded,
+                    s.fills_encoded, s.borders_encoded, s.lines_encoded, s.arcs_encoded, s.shadows_encoded,
                     s.images_encoded, s.layers_encoded, s.blobs_uploaded,
                     s.blob_bytes_sent / 1024u);
             fflush(stderr);

@@ -26,7 +26,7 @@ except ImportError:
     sys.exit(0)
 
 URI = "ws://127.0.0.1:9000/"
-OP_BEGIN, OP_END, OP_FILL, OP_BORDER, OP_LINE, OP_BOX_SHADOW, OP_IMAGE, OP_BLOB_UPLOAD = 0x01, 0x02, 0x10, 0x11, 0x12, 0x13, 0x21, 0x40
+OP_BEGIN, OP_END, OP_FILL, OP_BORDER, OP_LINE, OP_BOX_SHADOW, OP_IMAGE, OP_BLOB_UPLOAD, OP_ARC = 0x01, 0x02, 0x10, 0x11, 0x12, 0x13, 0x21, 0x40, 0x22
 N_FRAMES = 20  # enough to catch a 50% drop pattern many times over
 
 EXPECTED_COLORS = {  # (r, g, b) — see main.c demo scene
@@ -92,6 +92,8 @@ def main():
     border_payload_lens = set()
     saw_line = False
     line_payload_lens = set()
+    saw_arc = False
+    arc_payload_lens = set()
     saw_shadow = False
     shadow_payload_lens = set()
     saw_image = False
@@ -146,6 +148,9 @@ def main():
             elif op == OP_LINE:
                 saw_line = True
                 line_payload_lens.add(len(payload))
+            elif op == OP_ARC:
+                saw_arc = True
+                arc_payload_lens.add(len(payload))
             elif op == OP_BOX_SHADOW:
                 saw_shadow = True
                 shadow_payload_lens.add(len(payload))
@@ -181,6 +186,10 @@ def main():
             failures.append("no LINE op observed — M3a line replay missing")
     if line_payload_lens and line_payload_lens != {13}:
         failures.append(f"LINE payload size unexpected: {line_payload_lens} (want {{13}})")
+    if not saw_arc:
+        failures.append("no ARC op observed — M3b arc replay missing")
+    if arc_payload_lens and arc_payload_lens != {15}:
+        failures.append(f"ARC payload size unexpected: {arc_payload_lens} (want {{15}})")
     if not saw_shadow:
         failures.append("no BOX_SHADOW op observed — M2 demo shadows missing")
     if shadow_payload_lens and shadow_payload_lens != {20}:
@@ -215,6 +224,7 @@ def main():
         f"all non-empty, fids monotonic, {len(seen_colors)} unique colors, "
         f"borders={saw_border} sides_seen={sorted(border_sides_seen)} "
         f"lines={saw_line} line_payloads={sorted(line_payload_lens)} "
+        f"arcs={saw_arc} arc_payloads={sorted(arc_payload_lens)} "
         f"shadows={saw_shadow} images={saw_image} "
         f"layer_like={layer_like_image_count} x_span={sorted(layer_like_x_positions)[:4]} "
         f"blobs_seen={saw_blob_upload}"

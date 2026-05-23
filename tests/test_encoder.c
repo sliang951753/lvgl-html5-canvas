@@ -193,6 +193,33 @@ static int test_line_payload(void)
     return 0;
 }
 
+static int test_arc_payload(void)
+{
+    uint8_t buf[1024];
+    lhc_enc_t e;
+    lhc_enc_init(&e, buf, sizeof(buf));
+    lhc_enc_begin_frame(&e, 0, 100, 100);
+    /* arc: center(120,140), r=45, angles 30->270, argb 0x80A1B2C3, width=7 */
+    lhc_enc_arc(&e, 120, 140, 45, 30, 270, 0x80A1B2C3u, 7);
+    lhc_enc_end_frame(&e);
+    size_t n = lhc_enc_finalize(&e);
+    CHECK(n > 0, "no overflow");
+    CHECK(e.cmd_count == 3, "3 cmds");
+    const uint8_t *p = buf + 12;
+    CHECK(p[0] == LHC_OP_ARC, "ARC opcode");
+    CHECK((p[1] & LHC_FLAG_HAS_ALPHA_HINT) != 0, "alpha hint set");
+    CHECK(p[2] == 15 && p[3] == 0, "payload_len=15");
+    CHECK(p[4] == 120 && p[5] == 0, "cx LE");
+    CHECK(p[6] == 140 && p[7] == 0, "cy LE");
+    CHECK(p[8] == 45 && p[9] == 0, "r LE");
+    CHECK(p[10] == 30 && p[11] == 0, "a0 LE");
+    CHECK(p[12] == 14 && p[13] == 1, "a1 LE (270)");
+    /* argb 0x80A1B2C3 LE -> C3 B2 A1 80 */
+    CHECK(p[14] == 0xC3 && p[15] == 0xB2 && p[16] == 0xA1 && p[17] == 0x80, "argb LE");
+    CHECK(p[18] == 7, "arc width");
+    return 0;
+}
+
 static int test_box_shadow_payload(void)
 {
     uint8_t buf[1024];
@@ -275,6 +302,7 @@ int main(void)
         { "reinit_resets_state", test_reinit_resets_state },
         { "border_payload",      test_border_payload },
         { "line_payload",        test_line_payload },
+        { "arc_payload",         test_arc_payload },
         { "box_shadow_payload",  test_box_shadow_payload },
         { "image_and_blob_payload", test_image_and_blob_payload },
     };

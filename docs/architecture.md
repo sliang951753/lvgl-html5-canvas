@@ -60,10 +60,10 @@ Hand-off between the threads:
    `fills_this_frame = 0`.
 2. LVGL builds the task list and asks every draw unit to `evaluate()`.
    The html5 unit returns `1` for a constrained subset of task types
-   (currently FILL / BORDER / LINE / BOX_SHADOW / IMAGE / LAYER) with
+   (currently FILL / BORDER / LINE / ARC / BOX_SHADOW / IMAGE / LAYER) with
    `score = 80` (beats SW's 100), claiming them.
 3. LVGL repeatedly calls `dispatch()` on each unit. We encode each
-   claimed task as protocol ops (`FILL_RECT`, `BORDER`, `LINE`,
+   claimed task as protocol ops (`FILL_RECT`, `BORDER`, `LINE`, `ARC`,
    `BOX_SHADOW`, `IMAGE`, plus blob management for image/layer sources)
    and mark it `FINISHED`. The SW unit continues to render anything we
    into the dummy framebuffer (which the dummy flush_cb then discards).
@@ -84,7 +84,7 @@ having to rewire the protocol.
 `main.c` prints one compact stats line per second:
 
 - `eval`, `disp`, `taken`, `frames`
-- per-op encoded counters: `fills`, `borders`, `lines`, `shadows`, `images`, `layers`
+- per-op encoded counters: `fills`, `borders`, `lines`, `arcs`, `shadows`, `images`, `layers`
 - blob traffic: `blobs`, `blobKB`
 
 Use these counters to confirm capability deltas quickly without pixel

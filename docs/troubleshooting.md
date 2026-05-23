@@ -77,6 +77,21 @@ Polyline/dashed/rounded variants intentionally fall back to SW for now.
 2. Confirm `lines=` counter rises in `~/lhc.log`.
 3. Keep polyline/dashed lines in demo as explicit SW fallback coverage.
 
+### ARC capability appears missing / `arcs=0` in stats
+**Symptom:** After M3b rollout, arc widgets are visible via SW fallback but runtime stats
+show `arcs=0`.
+
+**Cause:** Current ARC fast path only claims simple color-only arc tasks:
+- `img_src == NULL`
+- `opa > 0`, `width > 0`, `radius > 0`
+
+Image-source arcs and unsupported variants intentionally fall back to SW.
+
+**Fix:**
+1. Validate with standard `lv_arc` widgets using color styles first.
+2. Confirm `arcs=` counter rises in `~/lhc.log`.
+3. Keep advanced arc variants as explicit SW fallback coverage until claimed.
+
 ### LAYER capability appears ineffective / `layers=0` in stats
 **Symptom:** After M2d, visual output seems unchanged and runtime stats
 show `layers=0` while other counters move.

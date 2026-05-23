@@ -121,6 +121,23 @@ fall back to LVGL SW draw unit.
 
 ---
 
+### ARC payload (15 bytes)
+
+| Offset | Size | Field   | Notes |
+|-------:|-----:|---------|-------|
+| 0      | 2    | `cx`    | i16 LE, arc center x |
+| 2      | 2    | `cy`    | i16 LE, arc center y |
+| 4      | 2    | `r`     | u16 LE, outer radius |
+| 6      | 2    | `a0`    | i16 LE, start angle in degrees |
+| 8      | 2    | `a1`    | i16 LE, end angle in degrees |
+| 10     | 4    | `argb`  | u32 LE bytes = `[B, G, R, A]` |
+| 14     | 1    | `width` | u8, stroke width in px |
+
+Current M3b server claims simple color-only arc tasks (`img_src == NULL`).
+Image-source arcs and other advanced variants still fall back to LVGL SW.
+
+---
+
 ## 3. Frame semantics
 
 - The server is authoritative. A new viewer that connects mid-stream

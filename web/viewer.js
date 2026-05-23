@@ -192,6 +192,19 @@ function renderFrame(frame) {
         ctx.stroke();
         break;
       }
+      case Proto.OP_ARC: {
+        const d = Decoders[cmd.opcode](cmd.payload);
+        const start = (d.a0 * Math.PI) / 180;
+        const end = (d.a1 * Math.PI) / 180;
+        ctx.strokeStyle = argbToCss(d.argb);
+        ctx.lineWidth = Math.max(1, d.width);
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'miter';
+        ctx.beginPath();
+        ctx.arc(d.cx, d.cy, Math.max(1, d.r), start, end, false);
+        ctx.stroke();
+        break;
+      }
       case Proto.OP_BOX_SHADOW: {
         const d = Decoders[cmd.opcode](cmd.payload);
         // LVGL box shadow: paint a rect outside the base rect, expanded by

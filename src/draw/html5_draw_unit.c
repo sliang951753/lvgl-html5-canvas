@@ -10,6 +10,8 @@
  *
  * M3a extension: claim and encode simple LV_DRAW_TASK_TYPE_LINE tasks
  * (single segment only; no polyline/dash/round caps yet) as OP_LINE (0x12).
+ * M3b extension: claim and encode simple LV_DRAW_TASK_TYPE_ARC tasks
+ * (solid-color stroke only, no image-source arcs) as OP_ARC (0x22).
  *
  * Frame buffer is a single static 64 KiB scratch — fine for M1 demos.
  * Overflows are dropped (logged once per frame) so the SW unit still
@@ -26,6 +28,7 @@
 #include "src/draw/lv_draw_private.h"
 #include "src/draw/lv_draw_image.h"
 #include "src/draw/lv_draw_line.h"
+#include "src/draw/lv_draw_arc.h"
 #include "src/draw/lv_draw_rect.h"
 #include "src/draw/lv_image_dsc.h"
 #include "src/misc/lv_grad.h"
@@ -50,6 +53,8 @@
 typedef struct {
     lv_draw_unit_t base;
 } lhc_draw_unit_t;
+
+static bool g_logged_arc_unsupported = false;
 
 static lhc_draw_unit_t   *g_unit = NULL;
 static lhc_ws_server_t   *g_ws = NULL;
@@ -137,6 +142,16 @@ static bool line_is_simple(const lv_draw_line_dsc_t *d)
     /* M3a: accept both direct (p1/p2) and polyline-backed line tasks.
      * We'll encode a single segment from p1/p2; when LVGL stores points,
      * SW may still iterate additional segments separately. */
+    return true;
+}
+
+static bool arc_is_simple(const lv_draw_arc_dsc_t *d)
+{
+    if (!d) return false;
+    if (d->opa == 0) return false;
+    if (d->width <= 0) return false;
+    if (d->radius == 0) return false;
+    if (d->img_src != NULL) return false; /* M3b: color-only arc */
     return true;
 }
 
@@ -313,6 +328,9 @@ static int32_t lhc_evaluate_cb(lv_draw_unit_t *du, lv_draw_task_t *task)
     } else if (task->type == LV_DRAW_TASK_TYPE_LINE) {
         const lv_draw_line_dsc_t *d = (const lv_draw_line_dsc_t *)task->draw_dsc;
         if (!line_is_simple(d)) return 0;
+    } else if (task->type == LV_DRAW_TASK_TYPE_ARC) {
+        const lv_draw_arc_dsc_t *d = (const lv_draw_arc_dsc_t *)task->draw_dsc;
+        if (!arc_is_simple(d)) return 0;
     } else if (task->type == LV_DRAW_TASK_TYPE_IMAGE) {
         const lv_draw_image_dsc_t *d = (const lv_draw_image_dsc_t *)task->draw_dsc;
         if (!image_is_simple(d)) return 0;
@@ -395,6 +413,19 @@ static int32_t lhc_dispatch_cb(lv_draw_unit_t *du, lv_layer_t *layer)
             lhc_enc_line(&g_enc, x1, y1, x2, y2, argb, (uint8_t)lw);
             g_ops_this_frame++;
             g_stats.lines_encoded++;
+        } else if (t->type == LV_DRAW_TASK_TYPE_ARC) {
+            const lv_draw_arc_dsc_t *d = (const lv_draw_arc_dsc_t *)t->draw_dsc;
+            uint32_t opa = (uint32_t)d->opa * (uint32_t)t->opa / 255u;
+            uint32_t argb = color_to_argb(d->color, (lv_opa_t)opa);
+            int32_t lw = d->width; if (lw < 1) lw = 1; if (lw > 255) lw = 255;
+            int32_t r = d->radius; if (r < 1) r = 1; if (r > 65535) r = 65535;
+            int16_t cx = (int16_t)d->center.x;
+            int16_t cy = (int16_t)d->center.y;
+            int16_t a0 = (int16_t)d->start_angle;
+            int16_t a1 = (int16_t)d->end_angle;
+            lhc_enc_arc(&g_enc, cx, cy, (uint16_t)r, a0, a1, argb, (uint8_t)lw);
+            g_ops_this_frame++;
+            g_stats.arcs_encoded++;
         } else if (t->type == LV_DRAW_TASK_TYPE_IMAGE ||
                    t->type == LV_DRAW_TASK_TYPE_LAYER) {
             const lv_draw_image_dsc_t *d = (const lv_draw_image_dsc_t *)t->draw_dsc;
@@ -457,7 +488,8 @@ void lhc_html5_draw_unit_init(void)
     g_unit->base.delete_cb   = lhc_delete_cb;
     memset(&g_stats, 0, sizeof(g_stats));
     memset(g_blobs, 0, sizeof(g_blobs));
-    LV_LOG_INFO("lhc: html5 draw unit registered (M3a: +LINE over M2d FILL/BORDER/SHADOW/IMAGE/LAYER, score=80)");
+    g_logged_arc_unsupported = false;
+    LV_LOG_INFO("lhc: html5 draw unit registered (M3b: +ARC over M3a FILL/BORDER/LINE/SHADOW/IMAGE/LAYER, score=80)");
 }
 
 void lhc_html5_draw_unit_attach_ws(lhc_ws_server_t *srv)

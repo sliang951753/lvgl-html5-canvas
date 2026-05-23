@@ -110,6 +110,8 @@ LRU on both ends; capacity ~4 MB browser, ~256 KB board (configurable).
       for simple non-transformed blends
 - [x] LINE (0x12): single-segment non-dashed/no-round-cap fast path
       end-to-end (encoder/draw-unit/viewer/demo/tests)
+- [x] ARC (0x22): color-only arc stroke fast path
+      end-to-end (encoder/draw-unit/viewer/demo/tests)
 - [ ] LINE advanced shapes (polyline iterator / dash / round caps)
 - [ ] GLYPH (0x20) + BLOB_UPLOAD (0x40) — glyph cache (board hash,
       browser Map+LRU); demo text labels
