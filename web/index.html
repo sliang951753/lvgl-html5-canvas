@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>lvgl-html5-canvas viewer</title>
   <style>
     html, body { margin: 0; background: #1a1a1a; color: #ddd;
@@ -9,16 +10,18 @@
     #bar { padding: 6px 10px; background: #222; }
     #status { color: #6f6; }
     #canvas { display: block; margin: 10px auto; background: #000;
-              image-rendering: pixelated; }
+              image-rendering: pixelated;
+              max-width: 100%; height: auto; }
     #log { padding: 6px 10px; max-height: 120px; overflow: auto;
-           background: #111; font-family: monospace; font-size: 11px; }
+           background: #111; font-family: monospace; font-size: 11px;
+           white-space: pre-wrap; word-break: break-all; }
     button, input { background: #333; color: #ddd; border: 1px solid #555;
                     padding: 4px 8px; border-radius: 3px; }
   </style>
 </head>
 <body>
   <div id="bar">
-    <label>WS URL <input id="url" value="ws://localhost:9000/" size="32" /></label>
+    <label>WS URL <input id="url" value="" size="32" placeholder="auto" /></label>
     <button id="connect">Connect</button>
     <span id="status">disconnected</span>
   </div>

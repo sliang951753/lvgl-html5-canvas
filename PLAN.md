@@ -81,13 +81,22 @@ LRU on both ends; capacity ~4 MB browser, ~256 KB board (configurable).
 - linux-host builds, `lvgl_html5_canvas` runs `lv_demo_widgets`
 - **tag**: `v0.1.0-m0`
 
-### M1 — first pixels
+### M1 — first pixels ✅
 - protocol: BEGIN_FRAME / END_FRAME / FILL_RECT
-- frame buffer per viewer; flush in `LV_EVENT_REFR_FINISH`
-- decoder: clear → fill_rect loop
-- viewer.js: canvas sized from BEGIN_FRAME
-- demo: simple LVGL screen w/ colored rectangles
-- **tag**: `v0.2.0-m1`
+- frame buffer per viewer; flush in `LV_EVENT_REFR_READY`
+- decoder: clear → fill_rect loop (with rounded-rect support)
+- viewer.js: canvas sized from BEGIN_FRAME, auto-connect on load,
+  auto-reconnect on close, mobile viewport
+- WS server moved to its own pthread (libwebsockets 4.x scheduler
+  was blocking the LVGL main loop)
+- empty-frame drop fixes viewer flicker (LVGL fires no-op refresh
+  cycles between our forced repaints)
+- demo: 4 coloured rounded rectangles on dark BG
+- tests: `test_encoder` (6 cases) + `protocol_e2e` (20-frame
+  regression pin)
+- docs: `docs/protocol.md`, `docs/architecture.md`,
+  `docs/troubleshooting.md`
+- **tag**: `v0.2.0-m1` ✅
 
 ### M2 — text + lines + borders
 - BORDER / LINE / GLYPH / BLOB_UPLOAD

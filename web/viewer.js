@@ -89,17 +89,49 @@ function renderFrame(frame) {
   }
 }
 
+function defaultWsUrl() {
+  // Same host as the page, fixed port 9000. Works for localhost AND LAN.
+  const host = location.hostname || 'localhost';
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${host}:9000/`;
+}
+
 let ws = null;
-$('#connect').addEventListener('click', () => {
-  if (ws) { ws.close(); ws = null; }
-  const url = $('#url').value;
+let reconnectTimer = null;
+function doConnect() {
+  if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+  let url = $('#url').value.trim();
+  if (!url) { url = defaultWsUrl(); $('#url').value = url; }
   setStatus('connecting…', '#fc6');
+  log(`connect ${url}`);
   ws = connect(url, {
     onOpen:    () => { setStatus('connected', '#6f6'); log(`open ${url}`); },
-    onClose:   () => { setStatus('disconnected', '#f66'); log('close'); },
-    onError:   (e) => { setStatus('error', '#f66'); log(`error: ${e.message || e}`); },
+    onClose:   (ev) => {
+      const code = ev && ev.code;
+      const reason = ev && ev.reason;
+      const clean = ev && ev.wasClean;
+      setStatus('disconnected — retry in 2s', '#f66');
+      log(`close code=${code} reason="${reason||''}" wasClean=${clean}`);
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(doConnect, 2000);
+    },
+    onError:   (e) => {
+      setStatus('error', '#f66');
+      // The 'error' event itself carries no detail per spec; the real
+      // diagnostic comes from the following 'close' event's code/reason.
+      log(`error event (see close code below for detail)`);
+    },
     onMessage: handleMessage,
   });
+}
+$('#connect').addEventListener('click', () => {
+  clearTimeout(reconnectTimer);
+  doConnect();
+});
+// Auto-connect on load — no button click needed.
+window.addEventListener('DOMContentLoaded', () => {
+  $('#url').value = defaultWsUrl();
+  doConnect();
 });
 
 function handleMessage(data) {
