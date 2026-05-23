@@ -38,6 +38,45 @@ function argbToCss(argb) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+// Blob cache: blob_id -> ImageBitmap (preferred, GPU-friendly) or ImageData
+// fallback. We always keep an ImageData copy so a redraw works synchronously
+// even if the ImageBitmap promise is still pending.
+const blobCache = new Map(); // id -> { imageData, bitmap?: ImageBitmap }
+
+function storeBlob({ id, w, h, fmt, bytes }) {
+  // fmt 1 = ARGB8888 in canvas-native RGBA order (server pre-converted).
+  if (fmt !== 1) { log(`blob ${id}: unsupported fmt=${fmt}`); return; }
+  const expect = w * h * 4;
+  if (bytes.length !== expect) {
+    log(`blob ${id}: size mismatch got=${bytes.length} expect=${expect}`);
+    return;
+  }
+  // Copy because the underlying frame buffer is reused per WS message.
+  const copy = new Uint8ClampedArray(bytes); // copies via Uint8Array → Clamped
+  const imageData = new ImageData(copy, w, h);
+  blobCache.set(id, { imageData });
+  // Hint to GPU upload path; bitmap may resolve later but fallback path works.
+  if (typeof createImageBitmap === 'function') {
+    createImageBitmap(imageData).then((bm) => {
+      const slot = blobCache.get(id);
+      if (slot && slot.imageData === imageData) slot.bitmap = bm;
+    }).catch(() => {});
+  }
+}
+
+function drawBlob(c, id, x, y, w, h) {
+  const slot = blobCache.get(id);
+  if (!slot) return false;
+  if (slot.bitmap) {
+    c.drawImage(slot.bitmap, x, y, w, h);
+  } else {
+    // putImageData ignores transforms / w,h scaling — but we only claim
+    // tasks where dst size matches src, so this is fine.
+    c.putImageData(slot.imageData, x, y);
+  }
+  return true;
+}
+
 function fillRoundedRect(c, x, y, w, h, r) {
   if (r <= 0) { c.fillRect(x, y, w, h); return; }
   const rr = Math.min(r, Math.floor(w / 2), Math.floor(h / 2));
@@ -160,6 +199,24 @@ function renderFrame(frame) {
         }
         break;
       }
+      case Proto.OP_BLOB_UPLOAD: {
+        const d = Decoders[cmd.opcode](cmd.payload);
+        storeBlob(d);
+        break;
+      }
+      case Proto.OP_BLOB_EVICT: {
+        const d = Decoders[cmd.opcode](cmd.payload);
+        blobCache.delete(d.id);
+        break;
+      }
+      case Proto.OP_IMAGE: {
+        const d = Decoders[cmd.opcode](cmd.payload);
+        if (!drawBlob(ctx, d.blob_id, d.x, d.y, d.w, d.h)) {
+          // Blob not in cache yet — viewer joined mid-stream. Stays blank
+          // until the server's periodic refresh re-uploads it.
+        }
+        break;
+      }
       default:
         // unknown opcode — silently skip (forward compat)
         break;
@@ -239,4 +296,4 @@ function handleMessage(data) {
   }
 }
 
-log('viewer M2 ready (FILL_RECT + BORDER + BOX_SHADOW)');
+log('viewer M2c ready (FILL/BORDER/SHADOW/IMAGE)');

@@ -62,4 +62,21 @@ export const Decoders = {
     ofs_y:  p.getInt16(17, true),
     bg_cover: p.getUint8(19),
   }),
+  [Proto.OP_IMAGE]: (p) => ({
+    x: p.getInt16(0, true),  y: p.getInt16(2, true),
+    w: p.getInt16(4, true),  h: p.getInt16(6, true),
+    blob_id: p.getUint32(8, true) >>> 0,
+  }),
+  [Proto.OP_BLOB_UPLOAD]: (p) => {
+    // header(9) = u32 id; u16 w; u16 h; u8 fmt; then raw RGBA bytes
+    const id  = p.getUint32(0, true) >>> 0;
+    const w   = p.getUint16(4, true);
+    const h   = p.getUint16(6, true);
+    const fmt = p.getUint8(8);
+    const dataLen = p.byteLength - 9;
+    // Subarray of the original buffer; viewer copies into ImageData.
+    const bytes = new Uint8Array(p.buffer, p.byteOffset + 9, dataLen);
+    return { id, w, h, fmt, bytes };
+  },
+  [Proto.OP_BLOB_EVICT]: (p) => ({ id: p.getUint32(0, true) >>> 0 }),
 };

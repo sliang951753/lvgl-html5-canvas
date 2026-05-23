@@ -51,8 +51,16 @@ void lhc_enc_border(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
                     uint32_t argb, uint8_t width, uint8_t radius, uint8_t side);
 void lhc_enc_box_shadow(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
                         uint32_t argb, uint8_t radius, uint8_t blur,
-                        int8_t spread, int16_t ofs_x, int16_t ofs_y, uint8_t bg_cover);
-
+                        int8_t spread, int16_t ofs_x, int16_t ofs_y,
+                        uint8_t bg_cover);
+void lhc_enc_image(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
+                   uint32_t blob_id);
+/* BLOB_UPLOAD: data points to (w*h) pixels in canvas RGBA order for ARGB8888.
+ * Returns false on overflow (frame buffer full); caller can choose to skip
+ * the upload AND the IMAGE op that would reference it. */
+bool lhc_enc_blob_upload(lhc_enc_t *e, uint32_t blob_id, uint16_t w, uint16_t h,
+                         uint8_t fmt, const uint8_t *data, size_t data_len);
+void lhc_enc_blob_evict(lhc_enc_t *e, uint32_t blob_id);
 /* Low-level escape hatch (also used by tests). */
 bool lhc_enc_cmd(lhc_enc_t *e, uint8_t opcode, uint8_t flags,
                  const void *payload, uint16_t payload_len);

@@ -22,6 +22,7 @@
 
 #include "draw/html5_draw_unit.h"
 #include "transport/ws_server.h"
+#include "assets/demo_sprite.h"
 
 #define DISP_W 800
 #define DISP_H 480
@@ -184,9 +185,33 @@ int main(int argc, char **argv)
     lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
     lv_anim_start(&a);
 
+    /* M2c: two stationary sprites + one animated. The animated sprite proves
+     * IMAGE redraws every frame using the cached blob (no re-upload). */
+    lv_obj_t *img_static = lv_image_create(scr);
+    lv_image_set_src(img_static, &demo_sprite);
+    lv_obj_set_pos(img_static, 360, 80);
+
+    lv_obj_t *img_static2 = lv_image_create(scr);
+    lv_image_set_src(img_static2, &demo_sprite);
+    lv_obj_set_pos(img_static2, 600, 80);
+
+    lv_obj_t *img_mover = lv_image_create(scr);
+    lv_image_set_src(img_mover, &demo_sprite);
+    lv_obj_set_pos(img_mover, 60, 340);
+
+    lv_anim_t a2;
+    lv_anim_init(&a2);
+    lv_anim_set_var(&a2, img_mover);
+    lv_anim_set_values(&a2, DISP_W - 100, 60);
+    lv_anim_set_duration(&a2, 2500);
+    lv_anim_set_reverse_duration(&a2, 2500);
+    lv_anim_set_repeat_count(&a2, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&a2, (lv_anim_exec_xcb_t)lv_obj_set_x);
+    lv_anim_start(&a2);
+
     /* label (SW renders glyphs, html5 ignores in M1) */
     lv_obj_t *label = lv_label_create(scr);
-    lv_label_set_text(label, "lvgl-html5-canvas M2 — FILL + BORDER + BOX_SHADOW over WS");
+    lv_label_set_text(label, "lvgl-html5-canvas M2c — FILL + BORDER + SHADOW + IMAGE over WS");
     lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -30);
 

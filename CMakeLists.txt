@@ -130,6 +130,7 @@ if(LHC_BUILD_APP)
     src/main.c
     src/draw/html5_draw_unit.c
     src/transport/ws_server.c
+    src/assets/demo_sprite.c
   )
   target_include_directories(lvgl_html5_canvas PRIVATE
     src

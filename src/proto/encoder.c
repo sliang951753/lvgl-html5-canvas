@@ -144,3 +144,58 @@ void lhc_enc_box_shadow(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h
     /* shadow is almost always semi-transparent -> hint always set */
     lhc_enc_cmd(e, LHC_OP_BOX_SHADOW, LHC_FLAG_HAS_ALPHA_HINT, p, sizeof(p));
 }
+
+void lhc_enc_image(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
+                   uint32_t blob_id)
+{
+    uint8_t p[12];
+    p[0]  = (uint8_t)(x & 0xFF);  p[1]  = (uint8_t)((x >> 8) & 0xFF);
+    p[2]  = (uint8_t)(y & 0xFF);  p[3]  = (uint8_t)((y >> 8) & 0xFF);
+    p[4]  = (uint8_t)(w & 0xFF);  p[5]  = (uint8_t)((w >> 8) & 0xFF);
+    p[6]  = (uint8_t)(h & 0xFF);  p[7]  = (uint8_t)((h >> 8) & 0xFF);
+    p[8]  = (uint8_t)(blob_id & 0xFF);
+    p[9]  = (uint8_t)((blob_id >> 8) & 0xFF);
+    p[10] = (uint8_t)((blob_id >> 16) & 0xFF);
+    p[11] = (uint8_t)((blob_id >> 24) & 0xFF);
+    /* Images with alpha are the common case for icons/sprites. */
+    lhc_enc_cmd(e, LHC_OP_IMAGE, LHC_FLAG_HAS_ALPHA_HINT, p, sizeof(p));
+}
+
+bool lhc_enc_blob_upload(lhc_enc_t *e, uint32_t blob_id, uint16_t w, uint16_t h,
+                         uint8_t fmt, const uint8_t *data, size_t data_len)
+{
+    if (e->overflow) return false;
+    /* payload = 9-byte header + raw bytes; payload_len is u16 -> max 65535 */
+    const size_t hdr_bytes = 9;
+    if (data_len + hdr_bytes > 0xFFFF) { return false; }
+    uint16_t payload_len = (uint16_t)(hdr_bytes + data_len);
+    if (e->pos + LHC_CMD_HDR_SIZE + payload_len > e->cap) {
+        e->overflow = true;
+        return false;
+    }
+    /* command header */
+    wr_u8(e, LHC_OP_BLOB_UPLOAD);
+    wr_u8(e, 0);
+    wr_u16(e, payload_len);
+    /* blob header */
+    wr_u32(e, blob_id);
+    wr_u16(e, w);
+    wr_u16(e, h);
+    wr_u8(e, fmt);
+    if (data_len) {
+        memcpy(e->buf + e->pos, data, data_len);
+        e->pos += data_len;
+    }
+    e->cmd_count++;
+    return !e->overflow;
+}
+
+void lhc_enc_blob_evict(lhc_enc_t *e, uint32_t blob_id)
+{
+    uint8_t p[4];
+    p[0] = (uint8_t)(blob_id & 0xFF);
+    p[1] = (uint8_t)((blob_id >> 8) & 0xFF);
+    p[2] = (uint8_t)((blob_id >> 16) & 0xFF);
+    p[3] = (uint8_t)((blob_id >> 24) & 0xFF);
+    lhc_enc_cmd(e, LHC_OP_BLOB_EVICT, 0, p, sizeof(p));
+}

@@ -44,6 +44,9 @@ typedef struct {
     uint32_t fills_encoded;
     uint32_t borders_encoded;
     uint32_t shadows_encoded;
+    uint32_t images_encoded;
+    uint32_t blobs_uploaded;
+    uint32_t blob_bytes_sent;
 } lhc_html5_stats_t;
 void lhc_html5_draw_unit_get_stats(lhc_html5_stats_t *out);
 

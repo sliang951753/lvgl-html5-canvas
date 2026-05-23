@@ -46,6 +46,11 @@
 #define LHC_OP_CLEAR_CLIP       0x31    /* (none)                           (0) */
 
 /* @op category: blob mgmt */
+/* BLOB_UPLOAD payload layout (header = 9 bytes, then pixel bytes):
+ *   u32 id; u16 w; u16 h; u8 fmt; <data...>
+ * For LHC_BLOB_FMT_ARGB8888 the pixel bytes are canvas-native RGBA order
+ * (R,G,B,A per pixel) so the viewer can putImageData directly. Data length
+ * is (payload_len - 9). Max payload_len = 65535 → max blob ≤ 65526 bytes. */
 #define LHC_OP_BLOB_UPLOAD      0x40    /* u32 id; u16 w,h; u8 fmt; bytes[] (variable) */
 #define LHC_OP_BLOB_EVICT       0x41    /* u32 id                           (4) */
 

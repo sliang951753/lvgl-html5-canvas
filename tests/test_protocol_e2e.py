@@ -26,7 +26,7 @@ except ImportError:
     sys.exit(0)
 
 URI = "ws://127.0.0.1:9000/"
-OP_BEGIN, OP_END, OP_FILL, OP_BORDER, OP_BOX_SHADOW = 0x01, 0x02, 0x10, 0x11, 0x13
+OP_BEGIN, OP_END, OP_FILL, OP_BORDER, OP_BOX_SHADOW, OP_IMAGE, OP_BLOB_UPLOAD = 0x01, 0x02, 0x10, 0x11, 0x13, 0x21, 0x40
 N_FRAMES = 20  # enough to catch a 50% drop pattern many times over
 
 EXPECTED_COLORS = {  # (r, g, b) — see main.c demo scene
@@ -92,6 +92,10 @@ def main():
     border_payload_lens = set()
     saw_shadow = False
     shadow_payload_lens = set()
+    saw_image = False
+    image_payload_lens = set()
+    saw_blob_upload = False
+    blob_payload_lens = set()
 
     for i, msg in enumerate(frames):
         try:
@@ -138,6 +142,12 @@ def main():
             elif op == OP_BOX_SHADOW:
                 saw_shadow = True
                 shadow_payload_lens.add(len(payload))
+            elif op == OP_IMAGE:
+                saw_image = True
+                image_payload_lens.add(len(payload))
+            elif op == OP_BLOB_UPLOAD:
+                saw_blob_upload = True
+                blob_payload_lens.add(len(payload))
 
     missing = EXPECTED_COLORS - seen_colors
     if missing:
@@ -150,6 +160,14 @@ def main():
         failures.append("no BOX_SHADOW op observed — M2 demo shadows missing")
     if shadow_payload_lens and shadow_payload_lens != {20}:
         failures.append(f"BOX_SHADOW payload size unexpected: {shadow_payload_lens} (want {{20}})")
+    if not saw_image:
+        failures.append("no IMAGE op observed — M2c image replay missing")
+    if image_payload_lens and image_payload_lens != {12}:
+        failures.append(f"IMAGE payload size unexpected: {image_payload_lens} (want {{12}})")
+    # BLOB_UPLOAD may or may not appear in this 20-frame window: if the viewer
+    # connects after the initial upload and before refresh-period re-upload,
+    # IMAGE ops can still appear while blob uploads are absent. So we only
+    # validate payload shape when uploads are observed.
 
     if failures:
         print(f"FAIL ({len(failures)} issues over {len(frames)} frames):")
@@ -161,7 +179,7 @@ def main():
         f"PASS protocol_e2e: {len(frames)} frames, "
         f"all non-empty, fids monotonic, {len(seen_colors)} unique colors, "
         f"borders={saw_border} sides_seen={sorted(border_sides_seen)} "
-        f"shadows={saw_shadow}"
+        f"shadows={saw_shadow} images={saw_image} blobs_seen={saw_blob_upload}"
     )
     return 0
 

@@ -203,6 +203,41 @@ static int test_box_shadow_payload(void)
     return 0;
 }
 
+static int test_image_and_blob_payload(void)
+{
+    uint8_t buf[4096];
+    uint8_t rgba[16] = {
+        0x10,0x20,0x30,0x40, 0x11,0x21,0x31,0x41,
+        0x12,0x22,0x32,0x42, 0x13,0x23,0x33,0x43,
+    };
+    lhc_enc_t e;
+    lhc_enc_init(&e, buf, sizeof(buf));
+    lhc_enc_begin_frame(&e, 1, 64, 64);
+    CHECK(lhc_enc_blob_upload(&e, 0x12345678u, 2, 2, LHC_BLOB_FMT_ARGB8888, rgba, sizeof(rgba)), "blob upload ok");
+    lhc_enc_image(&e, 7, 9, 2, 2, 0x12345678u);
+    lhc_enc_end_frame(&e);
+    CHECK(lhc_enc_finalize(&e) > 0, "no overflow");
+
+    /* BEGIN is first cmd at +4.., so BLOB starts at +12 */
+    const uint8_t *p = buf + 12;
+    CHECK(p[0] == LHC_OP_BLOB_UPLOAD, "BLOB_UPLOAD opcode");
+    CHECK(p[2] == 25 && p[3] == 0, "blob payload len 9+16");
+    CHECK(p[4] == 0x78 && p[5] == 0x56 && p[6] == 0x34 && p[7] == 0x12, "blob id LE");
+    CHECK(p[8] == 2 && p[9] == 0 && p[10] == 2 && p[11] == 0, "blob w/h LE");
+    CHECK(p[12] == LHC_BLOB_FMT_ARGB8888, "blob fmt");
+    CHECK(p[13] == 0x10 && p[28] == 0x43, "blob bytes preserved");
+
+    /* IMAGE command follows blob cmd: 4+25 bytes later */
+    const uint8_t *q = p + 29;
+    CHECK(q[0] == LHC_OP_IMAGE, "IMAGE opcode");
+    CHECK((q[1] & LHC_FLAG_HAS_ALPHA_HINT) != 0, "image alpha hint set");
+    CHECK(q[2] == 12 && q[3] == 0, "image payload len");
+    CHECK(q[4] == 7 && q[5] == 0 && q[6] == 9 && q[7] == 0, "image x/y LE");
+    CHECK(q[8] == 2 && q[9] == 0 && q[10] == 2 && q[11] == 0, "image w/h LE");
+    CHECK(q[12] == 0x78 && q[13] == 0x56 && q[14] == 0x34 && q[15] == 0x12, "image blob id LE");
+    return 0;
+}
+
 int main(void)
 {
     struct { const char *name; int (*fn)(void); } tests[] = {
@@ -214,6 +249,7 @@ int main(void)
         { "reinit_resets_state", test_reinit_resets_state },
         { "border_payload",      test_border_payload },
         { "box_shadow_payload",  test_box_shadow_payload },
+        { "image_and_blob_payload", test_image_and_blob_payload },
     };
     int failures = 0;
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
