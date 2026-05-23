@@ -6,6 +6,7 @@
  * M1: FILL_RECT (solid colour, no gradient).
  * M2: + BORDER (solid colour, any side mask, with radius).
  *     + BOX_SHADOW (solid color, radius/blur/spread/offset).
+ * M3a: + LINE (single-segment, non-dashed, no round caps).
  * Begin/End frame is driven from main.c via display REFR_START / REFR_READY
  * events.
  */
@@ -45,6 +46,7 @@ typedef struct {
     uint32_t borders_encoded;
     uint32_t shadows_encoded;
     uint32_t images_encoded;
+    uint32_t lines_encoded;
     uint32_t layers_encoded;
     uint32_t blobs_uploaded;
     uint32_t blob_bytes_sent;

@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "lvgl.h"
+#include "src/widgets/line/lv_line.h"
 
 #include "draw/html5_draw_unit.h"
 #include "transport/ws_server.h"
@@ -58,6 +59,26 @@ static void on_refr_ready(lv_event_t *e)
     (void)e;
     static int n = 0; if (++n <= 5 || n % 30 == 0) { fprintf(stderr, "lhc: REFR_READY #%d\n", n); fflush(stderr); }
     lhc_html5_draw_unit_flush_frame();
+}
+
+static void line_anim_cb(void *var, int32_t v)
+{
+    lv_obj_t *obj = (lv_obj_t *)var;
+    lv_point_precise_t *pts = lv_line_get_points_mutable(obj);
+    if (!pts) return;
+    pts[1].x = (lv_value_precise_t)v;
+    lv_obj_invalidate(obj);
+}
+
+/* M3a direct line draw task (p1/p2 path): emitted from a DRAW_MAIN callback
+ * to guarantee at least one LV_DRAW_TASK_TYPE_LINE with d->points == NULL. */
+static lv_draw_line_dsc_t g_direct_line_dsc;
+
+static void direct_line_draw_cb(lv_event_t *e)
+{
+    lv_layer_t *layer = lv_event_get_layer(e);
+    g_direct_line_dsc.base.layer = layer;
+    lv_draw_line(layer, &g_direct_line_dsc);
 }
 
 int main(int argc, char **argv)
@@ -252,9 +273,75 @@ int main(int argc, char **argv)
     lv_anim_set_exec_cb(&a3, (lv_anim_exec_xcb_t)lv_obj_set_x);
     lv_anim_start(&a3);
 
+    /* M3a LINE: horizontal + diagonal single-segment lines are now encoded
+     * by html5 draw unit; the polyline below intentionally remains SW fallback
+     * in this step. */
+    static lv_point_precise_t line_pts_a[] = { {40, 0}, {220, 0} };
+    lv_obj_t *line_a = lv_line_create(scr);
+    lv_line_set_points_mutable(line_a, line_pts_a, 2);
+    lv_obj_set_size(line_a, 240, 12);
+    lv_obj_set_pos(line_a, 40, 225);
+    lv_obj_set_style_line_width(line_a, 4, LV_PART_MAIN);
+    lv_obj_set_style_line_color(line_a, lv_color_hex(0x00E5FF), LV_PART_MAIN);
+    lv_obj_set_style_line_opa(line_a, LV_OPA_COVER, LV_PART_MAIN);
+
+    static lv_point_precise_t line_pts_b[] = { {0, 0}, {180, 80} };
+    lv_obj_t *line_b = lv_line_create(scr);
+    lv_line_set_points_mutable(line_b, line_pts_b, 2);
+    lv_obj_set_size(line_b, 200, 96);
+    lv_obj_set_pos(line_b, 300, 210);
+    lv_obj_set_style_line_width(line_b, 6, LV_PART_MAIN);
+    lv_obj_set_style_line_color(line_b, lv_color_hex(0xFFD54F), LV_PART_MAIN);
+    lv_obj_set_style_line_opa(line_b, LV_OPA_80, LV_PART_MAIN);
+
+    /* M3a direct line draw task (p1/p2 path): should be claimed by html5 LINE encoder. */
+    static lv_obj_t *line_direct = NULL;
+    line_direct = lv_obj_create(scr);
+    lv_obj_remove_style_all(line_direct);
+    /* Keep it visible and full-screen so DRAW_MAIN always runs; style-less so
+     * it contributes no extra primitives except our explicit lv_draw_line(). */
+    lv_obj_set_size(line_direct, DISP_W, DISP_H);
+    lv_obj_set_pos(line_direct, 0, 0);
+
+    lv_draw_line_dsc_init(&g_direct_line_dsc);
+    g_direct_line_dsc.color = lv_color_hex(0xFF8A65);
+    g_direct_line_dsc.opa = LV_OPA_COVER;
+    g_direct_line_dsc.width = 5;
+    g_direct_line_dsc.round_start = 0;
+    g_direct_line_dsc.round_end = 0;
+    g_direct_line_dsc.raw_end = 0;
+    g_direct_line_dsc.dash_width = 0;
+    g_direct_line_dsc.dash_gap = 0;
+    g_direct_line_dsc.p1.x = 70;
+    g_direct_line_dsc.p1.y = 360;
+    g_direct_line_dsc.p2.x = 240;
+    g_direct_line_dsc.p2.y = 430;
+
+    lv_obj_add_event_cb(line_direct, direct_line_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
+
+    static lv_point_precise_t line_pts_c[] = { {0, 56}, {50, 12}, {105, 50}, {160, 8} };
+    lv_obj_t *line_c = lv_line_create(scr);
+    lv_line_set_points_mutable(line_c, line_pts_c, 4);
+    lv_obj_set_size(line_c, 180, 70);
+    lv_obj_set_pos(line_c, 540, 215);
+    lv_obj_set_style_line_width(line_c, 3, LV_PART_MAIN);
+    lv_obj_set_style_line_color(line_c, lv_color_hex(0xB2FF59), LV_PART_MAIN);
+    lv_obj_set_style_line_opa(line_c, LV_OPA_COVER, LV_PART_MAIN);
+
+    /* animate one LINE endpoint to prove live LINE task replay */
+    lv_anim_t a4;
+    lv_anim_init(&a4);
+    lv_anim_set_var(&a4, line_b);
+    lv_anim_set_values(&a4, 120, 188);
+    lv_anim_set_duration(&a4, 1700);
+    lv_anim_set_reverse_duration(&a4, 1700);
+    lv_anim_set_repeat_count(&a4, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&a4, line_anim_cb);
+    lv_anim_start(&a4);
+
     /* label (SW renders glyphs, html5 ignores in M1) */
     lv_obj_t *label = lv_label_create(scr);
-    lv_label_set_text(label, "lvgl-html5-canvas M2d — +LAYER (layered opacity) over WS");
+    lv_label_set_text(label, "lvgl-html5-canvas M3a — +LINE over WS (label still SW)");
     lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -30);
 
@@ -285,9 +372,9 @@ run_loop:
             lhc_html5_stats_t s;
             lhc_html5_draw_unit_get_stats(&s);
             fprintf(stderr,
-                    "lhc: stats eval=%u disp=%u taken=%u frames=%u fills=%u borders=%u shadows=%u images=%u layers=%u blobs=%u blobKB=%u\n",
+                    "lhc: stats eval=%u disp=%u taken=%u frames=%u fills=%u borders=%u lines=%u shadows=%u images=%u layers=%u blobs=%u blobKB=%u\n",
                     s.evaluate_calls, s.dispatch_calls, s.tasks_taken, s.frames_sent,
-                    s.fills_encoded, s.borders_encoded, s.shadows_encoded,
+                    s.fills_encoded, s.borders_encoded, s.lines_encoded, s.shadows_encoded,
                     s.images_encoded, s.layers_encoded, s.blobs_uploaded,
                     s.blob_bytes_sent / 1024u);
             fflush(stderr);

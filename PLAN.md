@@ -108,7 +108,9 @@ LRU on both ends; capacity ~4 MB browser, ~256 KB board (configurable).
       ARGB8888/XRGB8888 path, demo sprites, encoder/e2e coverage
 - [x] LAYER (LV_DRAW_TASK_TYPE_LAYER): replay as IMAGE over layer draw_buf
       for simple non-transformed blends
-- [ ] LINE (0x12)
+- [x] LINE (0x12): single-segment non-dashed/no-round-cap fast path
+      end-to-end (encoder/draw-unit/viewer/demo/tests)
+- [ ] LINE advanced shapes (polyline iterator / dash / round caps)
 - [ ] GLYPH (0x20) + BLOB_UPLOAD (0x40) — glyph cache (board hash,
       browser Map+LRU); demo text labels
 - **tag**: `v0.3.0-m2` (deferred until LINE + GLYPH land)

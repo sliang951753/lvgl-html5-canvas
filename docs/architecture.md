@@ -11,8 +11,9 @@
    │                                  REFR_START  │              │ html5_draw_unit  │ │
    │                                  REFR_READY  ▼              │ (id=50, score=80)│ │
    │                                      ┌────────────┐         │  - claims FILL/  │ │
-   │                                      │ begin_frame│         │    BORDER/SHADOW │ │
-   │                                      │ flush_frame│◀────────┤    IMAGE/LAYER   │ │
+   │                                      │ begin_frame│         │    BORDER/LINE/  │ │
+   │                                      │ flush_frame│◀────────┤    SHADOW/IMAGE/ │ │
+   │                                      │            │         │    LAYER         │ │
    │                                      └─────┬──────┘         └────────┬─────────┘ │
    │                                            │ broadcast(buf,n)        │           │
    │                                            ▼                         │           │
@@ -59,12 +60,12 @@ Hand-off between the threads:
    `fills_this_frame = 0`.
 2. LVGL builds the task list and asks every draw unit to `evaluate()`.
    The html5 unit returns `1` for a constrained subset of task types
-   (currently FILL / BORDER / BOX_SHADOW / IMAGE / LAYER) with
+   (currently FILL / BORDER / LINE / BOX_SHADOW / IMAGE / LAYER) with
    `score = 80` (beats SW's 100), claiming them.
 3. LVGL repeatedly calls `dispatch()` on each unit. We encode each
-   claimed task as protocol ops (`FILL_RECT`, `BORDER`, `BOX_SHADOW`,
-   `IMAGE`, plus blob management for image/layer sources) and mark it
-   `FINISHED`. The SW unit continues to render anything we didn't claim
+   claimed task as protocol ops (`FILL_RECT`, `BORDER`, `LINE`,
+   `BOX_SHADOW`, `IMAGE`, plus blob management for image/layer sources)
+   and mark it `FINISHED`. The SW unit continues to render anything we
    into the dummy framebuffer (which the dummy flush_cb then discards).
 4. LVGL emits `LV_EVENT_REFR_READY` → `flush_frame()`:
    - If `fills_this_frame == 0`, the frame is **dropped silently**
@@ -83,7 +84,7 @@ having to rewire the protocol.
 `main.c` prints one compact stats line per second:
 
 - `eval`, `disp`, `taken`, `frames`
-- per-op encoded counters: `fills`, `borders`, `shadows`, `images`, `layers`
+- per-op encoded counters: `fills`, `borders`, `lines`, `shadows`, `images`, `layers`
 - blob traffic: `blobs`, `blobKB`
 
 Use these counters to confirm capability deltas quickly without pixel

@@ -167,6 +167,32 @@ static int test_border_payload(void)
     return 0;
 }
 
+static int test_line_payload(void)
+{
+    uint8_t buf[1024];
+    lhc_enc_t e;
+    lhc_enc_init(&e, buf, sizeof(buf));
+    lhc_enc_begin_frame(&e, 0, 100, 100);
+    /* line: (12,34)->(78,90), semi-transparent cyan-ish color, width=6 */
+    lhc_enc_line(&e, 12, 34, 78, 90, 0x8011CCEEu, 6);
+    lhc_enc_end_frame(&e);
+    size_t n = lhc_enc_finalize(&e);
+    CHECK(n > 0, "no overflow");
+    CHECK(e.cmd_count == 3, "3 cmds");
+    const uint8_t *p = buf + 12;
+    CHECK(p[0] == LHC_OP_LINE, "LINE opcode");
+    CHECK((p[1] & LHC_FLAG_HAS_ALPHA_HINT) != 0, "alpha hint set");
+    CHECK(p[2] == 13 && p[3] == 0, "payload_len=13");
+    CHECK(p[4] == 12 && p[5] == 0, "x1 LE");
+    CHECK(p[6] == 34 && p[7] == 0, "y1 LE");
+    CHECK(p[8] == 78 && p[9] == 0, "x2 LE");
+    CHECK(p[10] == 90 && p[11] == 0, "y2 LE");
+    /* argb 0x8011CCEE LE -> EE CC 11 80 */
+    CHECK(p[12] == 0xEE && p[13] == 0xCC && p[14] == 0x11 && p[15] == 0x80, "argb LE");
+    CHECK(p[16] == 6, "line width");
+    return 0;
+}
+
 static int test_box_shadow_payload(void)
 {
     uint8_t buf[1024];
@@ -248,6 +274,7 @@ int main(void)
         { "multiple_fills",      test_multiple_fills },
         { "reinit_resets_state", test_reinit_resets_state },
         { "border_payload",      test_border_payload },
+        { "line_payload",        test_line_payload },
         { "box_shadow_payload",  test_box_shadow_payload },
         { "image_and_blob_payload", test_image_and_blob_payload },
     };

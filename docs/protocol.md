@@ -56,7 +56,7 @@ Decoders MUST skip unknown opcodes by advancing `4 + payload_len` bytes.
 
 ---
 
-## 2. Opcodes (v0 / M2d)
+## 2. Opcodes (v0 / M3a)
 
 | Opcode | Name          | Direction | Payload |
 |-------:|---------------|-----------|---------|
@@ -64,6 +64,7 @@ Decoders MUST skip unknown opcodes by advancing `4 + payload_len` bytes.
 | 0x02   | END_FRAME     | S → V     | 0 bytes |
 | 0x10   | FILL_RECT     | S → V     | 13 bytes |
 | 0x11   | BORDER        | S → V     | 15 bytes |
+| 0x12   | LINE          | S → V     | 13 bytes (`i16 x1,y1,x2,y2; u32 argb; u8 width`) |
 | 0x13   | BOX_SHADOW    | S → V     | 20 bytes |
 | 0x21   | IMAGE         | S → V     | 12 bytes |
 | 0x40   | BLOB_UPLOAD   | S → V     | variable (`9 + data_len`) |
@@ -102,6 +103,21 @@ as a u32 LE → on the wire the bytes are `[B, G, R, A]`.
   `b, g, r, a`.
 
 This was a real bug source during M1; the e2e test now pins it.
+
+### LINE payload (13 bytes)
+
+| Offset | Size | Field   | Notes |
+|-------:|-----:|---------|-------|
+| 0      | 2    | `x1`    | i16 LE, start point x |
+| 2      | 2    | `y1`    | i16 LE, start point y |
+| 4      | 2    | `x2`    | i16 LE, end point x |
+| 6      | 2    | `y2`    | i16 LE, end point y |
+| 8      | 4    | `argb`  | u32 LE bytes = `[B, G, R, A]` |
+| 12     | 1    | `width` | u8, line width in px |
+
+Current M3a server emits LINE only for simple single-segment line tasks
+(no polyline array, no dash, no round caps). Unsupported line styles
+fall back to LVGL SW draw unit.
 
 ---
 

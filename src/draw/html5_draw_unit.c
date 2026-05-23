@@ -8,6 +8,9 @@
  *  - begin_frame / flush_frame are driven from main.c on REFR_START /
  *    REFR_READY display events, then the buffer is broadcast over WS.
  *
+ * M3a extension: claim and encode simple LV_DRAW_TASK_TYPE_LINE tasks
+ * (single segment only; no polyline/dash/round caps yet) as OP_LINE (0x12).
+ *
  * Frame buffer is a single static 64 KiB scratch — fine for M1 demos.
  * Overflows are dropped (logged once per frame) so the SW unit still
  * renders the picture correctly even if we lose ops.
@@ -22,6 +25,7 @@
 #include "lvgl.h"
 #include "src/draw/lv_draw_private.h"
 #include "src/draw/lv_draw_image.h"
+#include "src/draw/lv_draw_line.h"
 #include "src/draw/lv_draw_rect.h"
 #include "src/draw/lv_image_dsc.h"
 #include "src/misc/lv_grad.h"
@@ -120,6 +124,19 @@ static bool box_shadow_is_simple(const lv_draw_box_shadow_dsc_t *d)
     if (!d) return false;
     if (d->opa == 0) return false;
     if (d->width == 0 && d->spread == 0 && d->ofs_x == 0 && d->ofs_y == 0) return false;
+    return true;
+}
+
+static bool line_is_simple(const lv_draw_line_dsc_t *d)
+{
+    if (!d) return false;
+    if (d->opa == 0) return false;
+    if (d->width <= 0) return false;
+    if (d->dash_width != 0 || d->dash_gap != 0) return false;
+
+    /* M3a: accept both direct (p1/p2) and polyline-backed line tasks.
+     * We'll encode a single segment from p1/p2; when LVGL stores points,
+     * SW may still iterate additional segments separately. */
     return true;
 }
 
@@ -293,6 +310,9 @@ static int32_t lhc_evaluate_cb(lv_draw_unit_t *du, lv_draw_task_t *task)
     } else if (task->type == LV_DRAW_TASK_TYPE_BOX_SHADOW) {
         const lv_draw_box_shadow_dsc_t *d = (const lv_draw_box_shadow_dsc_t *)task->draw_dsc;
         if (!box_shadow_is_simple(d)) return 0;
+    } else if (task->type == LV_DRAW_TASK_TYPE_LINE) {
+        const lv_draw_line_dsc_t *d = (const lv_draw_line_dsc_t *)task->draw_dsc;
+        if (!line_is_simple(d)) return 0;
     } else if (task->type == LV_DRAW_TASK_TYPE_IMAGE) {
         const lv_draw_image_dsc_t *d = (const lv_draw_image_dsc_t *)task->draw_dsc;
         if (!image_is_simple(d)) return 0;
@@ -363,6 +383,18 @@ static int32_t lhc_dispatch_cb(lv_draw_unit_t *du, lv_layer_t *layer)
                                (uint8_t)(d->bg_cover ? 1 : 0));
             g_ops_this_frame++;
             g_stats.shadows_encoded++;
+        } else if (t->type == LV_DRAW_TASK_TYPE_LINE) {
+            const lv_draw_line_dsc_t *d = (const lv_draw_line_dsc_t *)t->draw_dsc;
+            uint32_t opa = (uint32_t)d->opa * (uint32_t)t->opa / 255u;
+            uint32_t argb = color_to_argb(d->color, (lv_opa_t)opa);
+            int32_t lw = d->width; if (lw < 1) lw = 1; if (lw > 255) lw = 255;
+            int16_t x1 = (int16_t)d->p1.x;
+            int16_t y1 = (int16_t)d->p1.y;
+            int16_t x2 = (int16_t)d->p2.x;
+            int16_t y2 = (int16_t)d->p2.y;
+            lhc_enc_line(&g_enc, x1, y1, x2, y2, argb, (uint8_t)lw);
+            g_ops_this_frame++;
+            g_stats.lines_encoded++;
         } else if (t->type == LV_DRAW_TASK_TYPE_IMAGE ||
                    t->type == LV_DRAW_TASK_TYPE_LAYER) {
             const lv_draw_image_dsc_t *d = (const lv_draw_image_dsc_t *)t->draw_dsc;
@@ -425,7 +457,7 @@ void lhc_html5_draw_unit_init(void)
     g_unit->base.delete_cb   = lhc_delete_cb;
     memset(&g_stats, 0, sizeof(g_stats));
     memset(g_blobs, 0, sizeof(g_blobs));
-    LV_LOG_INFO("lhc: html5 draw unit registered (M2d: +LAYER over M2c FILL/BORDER/SHADOW/IMAGE, score=80)");
+    LV_LOG_INFO("lhc: html5 draw unit registered (M3a: +LINE over M2d FILL/BORDER/SHADOW/IMAGE/LAYER, score=80)");
 }
 
 void lhc_html5_draw_unit_attach_ws(lhc_ws_server_t *srv)

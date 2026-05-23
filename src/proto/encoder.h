@@ -49,6 +49,8 @@ void lhc_enc_fill_rect(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
                        uint32_t argb, uint8_t radius);
 void lhc_enc_border(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
                     uint32_t argb, uint8_t width, uint8_t radius, uint8_t side);
+void lhc_enc_line(lhc_enc_t *e, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
+                  uint32_t argb, uint8_t width);
 void lhc_enc_box_shadow(lhc_enc_t *e, int16_t x, int16_t y, int16_t w, int16_t h,
                         uint32_t argb, uint8_t radius, uint8_t blur,
                         int8_t spread, int16_t ofs_x, int16_t ofs_y,

@@ -180,6 +180,18 @@ function renderFrame(frame) {
         strokeBorder(ctx, d.x, d.y, d.w, d.h, d.width, d.radius, d.side);
         break;
       }
+      case Proto.OP_LINE: {
+        const d = Decoders[cmd.opcode](cmd.payload);
+        ctx.strokeStyle = argbToCss(d.argb);
+        ctx.lineWidth = Math.max(1, d.width);
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'miter';
+        ctx.beginPath();
+        ctx.moveTo(d.x1, d.y1);
+        ctx.lineTo(d.x2, d.y2);
+        ctx.stroke();
+        break;
+      }
       case Proto.OP_BOX_SHADOW: {
         const d = Decoders[cmd.opcode](cmd.payload);
         // LVGL box shadow: paint a rect outside the base rect, expanded by
@@ -302,4 +314,4 @@ function handleMessage(data) {
   }
 }
 
-log('viewer M2c ready (FILL/BORDER/SHADOW/IMAGE)');
+log('viewer M3a ready (FILL/BORDER/LINE/SHADOW/IMAGE)');

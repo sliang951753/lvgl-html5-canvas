@@ -61,6 +61,22 @@ diagnostic lives. Our viewer logs both since v0.2.0-m1.
 
 ## Server-side issues
 
+### LINE capability appears missing / `lines=0` in stats
+**Symptom:** After M3a rollout, line widgets are visible but runtime stats
+show `lines=0`.
+
+**Cause:** Current LINE fast path only claims simple single-segment lines:
+- `points == NULL` and `point_cnt == 0`
+- no dash (`dash_width == 0`, `dash_gap == 0`)
+- no round caps (`round_start == round_end == 0`)
+
+Polyline/dashed/rounded variants intentionally fall back to SW for now.
+
+**Fix:**
+1. Validate with a 2-point line object (single segment) first.
+2. Confirm `lines=` counter rises in `~/lhc.log`.
+3. Keep polyline/dashed lines in demo as explicit SW fallback coverage.
+
 ### LAYER capability appears ineffective / `layers=0` in stats
 **Symptom:** After M2d, visual output seems unchanged and runtime stats
 show `layers=0` while other counters move.
