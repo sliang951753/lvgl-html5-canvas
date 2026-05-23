@@ -209,9 +209,52 @@ int main(int argc, char **argv)
     lv_anim_set_exec_cb(&a2, (lv_anim_exec_xcb_t)lv_obj_set_x);
     lv_anim_start(&a2);
 
+    /* M2d: force LVGL LAYER tasks with a semi-transparent parent container.
+     * Children are rendered into an offscreen layer then blended back.
+     * This makes LV_DRAW_TASK_TYPE_LAYER visible in stats/logs. */
+    lv_obj_t *layer_host = lv_obj_create(scr);
+    /* Keep <=128x128 so it goes through current html5 layer/image fast path. */
+    lv_obj_set_size(layer_host, 120, 100);
+    lv_obj_set_pos(layer_host, 620, 320);
+    lv_obj_set_style_bg_color(layer_host, lv_color_hex(0x101820), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(layer_host, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_color(layer_host, lv_color_hex(0x9FA8DA), LV_PART_MAIN);
+    lv_obj_set_style_border_width(layer_host, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(layer_host, LV_OPA_70, LV_PART_MAIN);
+    lv_obj_set_style_radius(layer_host, 12, LV_PART_MAIN);
+    lv_obj_set_style_opa_layered(layer_host, 180, LV_PART_MAIN);
+
+    lv_obj_t *lh_rect = lv_obj_create(layer_host);
+    lv_obj_remove_style_all(lh_rect);
+    lv_obj_set_size(lh_rect, 46, 36);
+    lv_obj_set_pos(lh_rect, 8, 8);
+    lv_obj_set_style_bg_color(lh_rect, lv_color_hex(0xFF6F61), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(lh_rect, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(lh_rect, 10, LV_PART_MAIN);
+
+    lv_obj_t *lh_img = lv_image_create(layer_host);
+    lv_image_set_src(lh_img, &demo_sprite);
+    lv_obj_set_pos(lh_img, 60, 8);
+
+    lv_obj_t *lh_lbl = lv_label_create(layer_host);
+    lv_label_set_text(lh_lbl, "LAYER task demo");
+    lv_obj_set_style_text_color(lh_lbl, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_align(lh_lbl, LV_ALIGN_BOTTOM_MID, 0, -6);
+
+    /* Animate layer host horizontally so LAYER task is continuously emitted. */
+    lv_anim_t a3;
+    lv_anim_init(&a3);
+    lv_anim_set_var(&a3, layer_host);
+    lv_anim_set_values(&a3, 600, 670);
+    lv_anim_set_duration(&a3, 2200);
+    lv_anim_set_reverse_duration(&a3, 2200);
+    lv_anim_set_repeat_count(&a3, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&a3, (lv_anim_exec_xcb_t)lv_obj_set_x);
+    lv_anim_start(&a3);
+
     /* label (SW renders glyphs, html5 ignores in M1) */
     lv_obj_t *label = lv_label_create(scr);
-    lv_label_set_text(label, "lvgl-html5-canvas M2c — FILL + BORDER + SHADOW + IMAGE over WS");
+    lv_label_set_text(label, "lvgl-html5-canvas M2d — +LAYER (layered opacity) over WS");
     lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -30);
 
@@ -241,8 +284,12 @@ run_loop:
             last_stat = now;
             lhc_html5_stats_t s;
             lhc_html5_draw_unit_get_stats(&s);
-            fprintf(stderr, "lhc: stats eval=%u disp=%u taken=%u frames=%u\n",
-                    s.evaluate_calls, s.dispatch_calls, s.tasks_taken, s.frames_sent);
+            fprintf(stderr,
+                    "lhc: stats eval=%u disp=%u taken=%u frames=%u fills=%u borders=%u shadows=%u images=%u layers=%u blobs=%u blobKB=%u\n",
+                    s.evaluate_calls, s.dispatch_calls, s.tasks_taken, s.frames_sent,
+                    s.fills_encoded, s.borders_encoded, s.shadows_encoded,
+                    s.images_encoded, s.layers_encoded, s.blobs_uploaded,
+                    s.blob_bytes_sent / 1024u);
             fflush(stderr);
         }
     }
